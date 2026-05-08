@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFS Draft 25/26</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --bg4: #22222f;
+    --accent: #00e5a0;
+    --accent2: #7c3aed;
+    --accent3: #f59e0b;
+    --text: #f0f0f8;
+    --text2: #9999bb;
+    --text3: #555570;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --gold: #ffd700;
+    --silver: #c0c0c0;
+    --bronze: #cd7f32;
+    --win: #00e5a0;
+    --draw: #f59e0b;
+    --loss: #ef4444;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--text); }
+  .logo span { color: var(--accent); }
+  .last-updated { font-size: 12px; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .live-dot { display: inline-block; width: 7px; height: 7px; background: var(--accent); border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* NAV */
+  .nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0;
+    padding: 0 2rem;
+    overflow-x: auto;
+  }
+  .nav-btn {
+    padding: 14px 20px;
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .nav-btn:hover { color: var(--text); }
+  .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* MAIN */
+  .main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* HERO STATS */
+  .hero-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 2rem; }
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .stat-card .label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .stat-card .value { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 1px; line-height: 1; color: var(--text); }
+  .stat-card .sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .stat-card.accent { border-color: var(--accent); }
+  .stat-card.accent .value { color: var(--accent); }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: var(--text2);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* TABLE */
+  .table-wrap { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--bg4); }
+  thead th { padding: 12px 16px; text-align: left; font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+  tbody tr { border-top: 1px solid var(--border); transition: background 0.15s; }
+  tbody tr:hover { background: var(--bg4); }
+  td { padding: 12px 16px; font-size: 14px; color: var(--text); }
+  td.num { font-family: 'DM Mono', monospace; font-size: 13px; text-align: right; }
+  td.team-name { font-weight: 500; }
+  .pos-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; }
+  .pos-1 { background: rgba(255,215,0,0.15); color: var(--gold); }
+  .pos-2 { background: rgba(192,192,192,0.15); color: var(--silver); }
+  .pos-3 { background: rgba(205,127,50,0.15); color: var(--bronze); }
+  .pos-n { background: var(--bg4); color: var(--text3); }
+
+  /* FORM DOTS */
+  .form { display: flex; gap: 4px; }
+  .form-dot { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; }
+  .form-w { background: rgba(0,229,160,0.15); color: var(--win); }
+  .form-d { background: rgba(245,158,11,0.15); color: var(--draw); }
+  .form-l { background: rgba(239,68,68,0.15); color: var(--loss); }
+
+  /* H2H GRID */
+  .h2h-grid-wrap { overflow-x: auto; margin-bottom: 2rem; }
+  .h2h-grid { border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+  .h2h-grid th, .h2h-grid td { padding: 8px 10px; border: 1px solid var(--border); text-align: center; }
+  .h2h-grid th { background: var(--bg4); color: var(--text3); font-size: 11px; }
+  .h2h-grid .team-label { text-align: left; font-weight: 500; color: var(--text); font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .cell-w { background: rgba(0,229,160,0.12); color: var(--win); font-weight: 600; }
+  .cell-d { background: rgba(245,158,11,0.12); color: var(--draw); font-weight: 600; }
+  .cell-l { background: rgba(239,68,68,0.1); color: var(--loss); }
+  .cell-blank { color: var(--text3); }
+
+  /* CUP BRACKET */
+  .cup-section { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+  .group-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .group-header { background: var(--bg4); padding: 12px 16px; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 2px; color: var(--text2); }
+  .ko-bracket { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
+  .ko-round { display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .ko-match { background: var(--bg4); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 200px; }
+  .ko-match .round-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .ko-team { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
+  .ko-team .score { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--accent); }
+  .ko-team.winner { font-weight: 600; color: var(--text); }
+  .ko-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .champion-banner { background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,215,0,0.05)); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 1.5rem; text-align: center; margin-bottom: 2rem; }
+  .champion-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+  .champion-name { font-family: 'Bebas Neue', sans-serif; font-size: 48px; color: var(--gold); letter-spacing: 3px; }
+
+  /* SQUAD */
+  .squad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .squad-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .squad-card-header { background: var(--bg4); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .squad-team-name { font-weight: 600; font-size: 14px; }
+  .squad-pts { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); }
+  .squad-player { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--border); font-size: 13px; }
+  .squad-player:hover { background: var(--bg4); }
+  .pos-pill { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; min-width: 34px; text-align: center; }
+  .pos-gk { background: rgba(124,58,237,0.2); color: #a78bfa; }
+  .pos-def { background: rgba(59,130,246,0.2); color: #60a5fa; }
+  .pos-mid { background: rgba(0,229,160,0.15); color: var(--accent); }
+  .pos-fwd { background: rgba(239,68,68,0.15); color: #f87171; }
+  .player-photo { width: 32px; height: 32px; border-radius: 50%; background: var(--bg4); border: 1px solid var(--border); overflow: hidden; flex-shrink: 0; }
+  .player-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .player-photo-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text3); }
+  .player-name { flex: 1; font-weight: 500; }
+  .player-pts { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); }
+
+  /* SIGNING FEED */
+  .signing-feed { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
+  .signing-feed-header { background: var(--bg4); padding: 12px 16px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .signing-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); animation: slideIn 0.4s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  .signing-photo { width: 44px; height: 44px; border-radius: 50%; background: var(--bg4); border: 2px solid var(--border2); overflow: hidden; flex-shrink: 0; }
+  .signing-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .signing-info { flex: 1; }
+  .signing-name { font-weight: 600; font-size: 14px; }
+  .signing-detail { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .signing-fee { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--accent); letter-spacing: 1px; }
+  .signing-team-badge { font-size: 11px; background: var(--bg4); border: 1px solid var(--border); padding: 3px 8px; border-radius: 4px; color: var(--text2); }
+
+  /* BUDGET BARS */
+  .budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 2rem; }
+  .budget-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+  .budget-team { font-weight: 500; font-size: 13px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .budget-remaining { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); }
+  .budget-bar-wrap { background: var(--bg4); border-radius: 4px; height: 6px; overflow: hidden; }
+  .budget-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .pos-tracker { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .pos-slot { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-family: 'DM Mono', monospace; }
+  .pos-slot.filled { background: rgba(0,229,160,0.15); color: var(--accent); }
+  .pos-slot.empty { background: var(--bg4); color: var(--text3); }
+  .pos-slot.over { background: rgba(239,68,68,0.2); color: #f87171; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 4rem; color: var(--text3); }
+  .loading-spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 1rem; color: #f87171; font-size: 13px; margin-bottom: 1rem; }
+
+  @media (max-width: 600px) {
+    .main { padding: 1rem; }
+    .cup-section { grid-template-columns: 1fr; }
+    .hero-stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">FFS <span>Draft</span> 25/26</div>
+  <div class="last-updated"><span class="live-dot"></span><span id="last-updated-text">Loading...</span></div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showPage('home')">Home</button>
+  <button class="nav-btn" onclick="showPage('league')">League Table</button>
+  <button class="nav-btn" onclick="showPage('h2h')">H2H</button>
+  <button class="nav-btn" onclick="showPage('cup')">ABA Cup</button>
+  <button class="nav-btn" onclick="showPage('squads')">Squads</button>
+  <button class="nav-btn" onclick="showPage('draft')">Live Draft</button>
+</div>
+
+<div class="main">
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+    <div id="home-loading" class="loading"><div class="loading-spinner"></div>Loading FFS Draft data...</div>
+    <div id="home-content" style="display:none">
+      <div class="hero-stats" id="hero-stats"></div>
+      <div class="section-title">Current Standings</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Pos</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th>
+            <th>Total Pts</th><th>Avg</th><th>Form</th>
+          </tr></thead>
+          <tbody id="home-table-body"></tbody>
+        </table>
+      </div>
+      <div class="section-title">This Week's Results</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Team</th><th>GW Score</th><th>vs Last GW</th></tr></thead>
+          <tbody id="gw-results-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEAGUE TABLE PAGE -->
+  <div id="page-league" class="page">
+    <div id="league-loading" class="loading"><div class="loading-spinner"></div>Loading league table...</div>
+    <div id="league-content" style="display:none">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Pos</th><th>Team</th><th>Manager</th><th>Pld</th>
+            <th>Total Pts</th><th>Avg Per GW</th><th>Highest GW</th>
+          </tr></thead>
+          <tbody id="league-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- H2H PAGE -->
+  <div id="page-h2h" class="page">
+    <div id="h2h-loading" class="loading"><div class="loading-spinner"></div>Loading H2H data...</div>
+    <div id="h2h-content" style="display:none">
+      <div class="section-title">H2H League Table</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Pos</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th>
+            <th>F</th><th>A</th><th>PD</th><th>Pts</th>
+          </tr></thead>
+          <tbody id="h2h-table-body"></tbody>
+        </table>
+      </div>
+      <div class="section-title">Form Grid</div>
+      <div class="h2h-grid-wrap">
+        <table class="h2h-grid" id="h2h-form-grid"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUP PAGE -->
+  <div id="page-cup" class="page">
+    <div id="cup-loading" class="loading"><div class="loading-spinner"></div>Loading cup data...</div>
+    <div id="cup-content" style="display:none">
+      <div class="section-title">Group Stage</div>
+      <div class="cup-section">
+        <div class="group-card">
+          <div class="group-header">Group A</div>
+          <table style="width:100%">
+            <thead><tr>
+              <th style="padding:10px 14px;text-align:left;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;background:var(--bg4)">Team</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;color:var(--text3);background:var(--bg4)">Pld</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;color:var(--text3);background:var(--bg4)">W</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;color:var(--text3);background:var(--bg4)">Pts</th>
+            </tr></thead>
+            <tbody id="cup-group-a"></tbody>
+          </table>
+        </div>
+        <div class="group-card">
+          <div class="group-header">Group B</div>
+          <table style="width:100%">
+            <thead><tr>
+              <th style="padding:10px 14px;text-align:left;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;background:var(--bg4)">Team</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;color:var(--text3);background:var(--bg4)">Pld</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;color:var(--text3);background:var(--bg4)">W</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;color:var(--text3);background:var(--bg4)">Pts</th>
+            </tr></thead>
+            <tbody id="cup-group-b"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="section-title">Knockout Rounds</div>
+      <div id="cup-ko-section"></div>
+    </div>
+  </div>
+
+  <!-- SQUADS PAGE -->
+  <div id="page-squads" class="page">
+    <div id="squads-loading" class="loading"><div class="loading-spinner"></div>Loading squads...</div>
+    <div id="squads-content" style="display:none">
+      <div class="squad-grid" id="squad-grid"></div>
+    </div>
+  </div>
+
+  <!-- LIVE DRAFT PAGE -->
+  <div id="page-draft" class="page">
+    <div id="draft-loading" class="loading"><div class="loading-spinner"></div>Loading draft data...</div>
+    <div id="draft-content" style="display:none">
+      <div class="section-title">Budget Tracker</div>
+      <div class="budget-grid" id="budget-grid"></div>
+      <div class="section-title">Recent Signings</div>
+      <div class="signing-feed">
+        <div class="signing-feed-header">
+          <span class="live-dot"></span> Live Transfer Feed
+        </div>
+        <div id="signing-feed-items"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// DATA URLS — your published Google Sheet CSV URLs
+// ============================================================
+var URLS = {
+  gameweekScores: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?gid=1469042968&single=true&output=csv',
+  leagueTable:    'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?gid=30663119&single=true&output=csv',
+  h2h:            'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?gid=800583406&single=true&output=csv',
+  cupGS:          'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?gid=579700582&single=true&output=csv',
+  transferList:   'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?gid=474568309&single=true&output=csv',
+  teamTab:        'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?gid=2131430857&single=true&output=csv'
+};
+
+var cache = {};
+var currentPage = 'home';
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(text) {
+  var lines = text.trim().split('\n');
+  return lines.map(function(line) {
+    var result = []; var cell = ''; var inQuote = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { inQuote = !inQuote; }
+      else if (c === ',' && !inQuote) { result.push(cell.trim()); cell = ''; }
+      else { cell += c; }
+    }
+    result.push(cell.trim());
+    return result;
+  });
+}
+
+// ============================================================
+// FETCH WITH CACHE
+// ============================================================
+function fetchCSV(url, callback) {
+  if (cache[url]) { callback(null, cache[url]); return; }
+  fetch(url)
+    .then(function(r) { return r.text(); })
+    .then(function(text) {
+      cache[url] = parseCSV(text);
+      callback(null, cache[url]);
+    })
+    .catch(function(e) { callback(e, null); });
+}
+
+// ============================================================
+// FPL PLAYER PHOTO URL
+// ============================================================
+function playerPhotoUrl(code) {
+  if (!code) return null;
+  return 'https://resources.premierleague.com/premierleague/photos/players/110x140/p' + code + '.png';
+}
+
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  currentPage = name;
+  loadPage(name);
+}
+
+function loadPage(name) {
+  if (name === 'home') loadHome();
+  else if (name === 'league') loadLeague();
+  else if (name === 'h2h') loadH2H();
+  else if (name === 'cup') loadCup();
+  else if (name === 'squads') loadSquads();
+  else if (name === 'draft') loadDraft();
+}
+
+// ============================================================
+// HOME PAGE
+// ============================================================
+function loadHome() {
+  fetchCSV(URLS.leagueTable, function(err, rows) {
+    if (err) { showError('home'); return; }
+    var teams = rows.slice(1).filter(function(r) { return r[0] && r[1]; });
+
+    // Hero stats
+    var totalGWs = parseInt(teams[0][3]) || 0;
+    var leader = teams[0][1] || '-';
+    var topPts = teams[0][4] || '0';
+    var highestGW = 0; var highestTeam = '';
+    teams.forEach(function(t) {
+      var h = parseInt(t[6]) || 0;
+      if (h > highestGW) { highestGW = h; highestTeam = t[1]; }
+    });
+
+    document.getElementById('hero-stats').innerHTML =
+      statCard('GW Played', totalGWs, 'Season Progress', true) +
+      statCard('Leader', leader, topPts + ' pts', false) +
+      statCard('Highest GW', highestGW, highestTeam, false) +
+      statCard('Teams', teams.length, 'In the league', false);
+
+    // Table with form
+    fetchCSV(URLS.gameweekScores, function(err2, gwRows) {
+      var formData = {};
+      if (!err2 && gwRows.length > 1) {
+        var shortNames = gwRows[0].slice(1);
+        var dataRows = gwRows.slice(1).filter(function(r) { return r[0] && r[0].toString().startsWith('GW'); });
+        shortNames.forEach(function(name, i) {
+          if (!name) return;
+          var last5 = dataRows.slice(-5).map(function(r) { return parseFloat(r[i+1]) || 0; });
+          formData[name] = last5;
+        });
+      }
+
+      var body = '';
+      teams.forEach(function(t, i) {
+        var pos = parseInt(t[0]) || (i+1);
+        var name = t[1];
+        var form = formData[name] || [];
+
+        // Work out W/D/L from GW scores — simplified (compare to median)
+        var allScores = [];
+        Object.keys(formData).forEach(function(n) {
+          formData[n].forEach(function(s) { if(s>0) allScores.push(s); });
+        });
+        allScores.sort(function(a,b){return a-b;});
+        var median = allScores[Math.floor(allScores.length/2)] || 40;
+
+        var formHtml = '<div class="form">';
+        form.forEach(function(s) {
+          if (s === 0) return;
+          if (s >= median * 1.05) formHtml += '<div class="form-dot form-w">W</div>';
+          else if (s >= median * 0.95) formHtml += '<div class="form-dot form-d">D</div>';
+          else formHtml += '<div class="form-dot form-l">L</div>';
+        });
+        formHtml += '</div>';
+
+        var posCls = pos === 1 ? 'pos-1' : pos === 2 ? 'pos-2' : pos === 3 ? 'pos-3' : 'pos-n';
+        body += '<tr><td><span class="pos-badge ' + posCls + '">' + pos + '</span></td>' +
+                '<td class="team-name">' + name + '</td>' +
+                '<td class="num">' + (t[3]||'') + '</td>' +
+                '<td class="num">' + (t[4]||'') + '</td>' +
+                '<td class="num">' + (t[5]||'') + '</td>' +
+                '<td class="num">' + (t[6]||'') + '</td>' +
+                '<td class="num" style="color:var(--accent)">' + (t[4]||'') + '</td>' +
+                '<td class="num">' + (t[5]||'') + '</td>' +
+                '<td>' + formHtml + '</td></tr>';
+      });
+      document.getElementById('home-table-body').innerHTML = body;
+
+      // GW results
+      if (!err2 && gwRows.length > 1) {
+        var shortNames2 = gwRows[0].slice(1).filter(Boolean);
+        var played = gwRows.slice(1).filter(function(r) { return r[0] && r[0].toString().startsWith('GW') && r.slice(1).some(function(v){ return parseFloat(v) > 0; }); });
+        var lastGW = played[played.length-1];
+        var prevGW = played[played.length-2];
+        if (lastGW) {
+          var gwBody = '';
+          shortNames2.forEach(function(name, i) {
+            var score = parseFloat(lastGW[i+1]) || 0;
+            var prev = prevGW ? (parseFloat(prevGW[i+1]) || 0) : 0;
+            var diff = score - prev;
+            var diffStr = diff > 0 ? '<span style="color:var(--win)">▲' + diff + '</span>' :
+                          diff < 0 ? '<span style="color:var(--loss)">▼' + Math.abs(diff) + '</span>' :
+                          '<span style="color:var(--text3)">—</span>';
+            gwBody += '<tr><td class="team-name">' + name + '</td>' +
+                      '<td class="num" style="color:var(--accent);font-size:16px">' + score + '</td>' +
+                      '<td class="num">' + diffStr + '</td></tr>';
+          });
+          document.getElementById('gw-results-body').innerHTML = gwBody;
+        }
+      }
+
+      document.getElementById('home-loading').style.display = 'none';
+      document.getElementById('home-content').style.display = 'block';
+      document.getElementById('last-updated-text').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    });
+  });
+}
+
+function statCard(label, value, sub, isAccent) {
+  return '<div class="stat-card' + (isAccent ? ' accent' : '') + '">' +
+         '<div class="label">' + label + '</div>' +
+         '<div class="value">' + value + '</div>' +
+         '<div class="sub">' + sub + '</div></div>';
+}
+
+// ============================================================
+// LEAGUE TABLE PAGE
+// ============================================================
+function loadLeague() {
+  fetchCSV(URLS.leagueTable, function(err, rows) {
+    if (err) { showError('league'); return; }
+    var teams = rows.slice(1).filter(function(r) { return r[0] && r[1]; });
+    var body = '';
+    teams.forEach(function(t, i) {
+      var pos = parseInt(t[0]) || (i+1);
+      var posCls = pos === 1 ? 'pos-1' : pos === 2 ? 'pos-2' : pos === 3 ? 'pos-3' : 'pos-n';
+      body += '<tr><td><span class="pos-badge ' + posCls + '">' + pos + '</span></td>' +
+              '<td class="team-name">' + (t[1]||'') + '</td>' +
+              '<td>' + (t[2]||'') + '</td>' +
+              '<td class="num">' + (t[3]||'') + '</td>' +
+              '<td class="num" style="font-size:16px;color:var(--accent);font-weight:600">' + (t[4]||'') + '</td>' +
+              '<td class="num">' + (t[5]||'') + '</td>' +
+              '<td class="num">' + (t[6]||'') + '</td></tr>';
+    });
+    document.getElementById('league-table-body').innerHTML = body;
+    document.getElementById('league-loading').style.display = 'none';
+    document.getElementById('league-content').style.display = 'block';
+  });
+}
+
+// ============================================================
+// H2H PAGE
+// ============================================================
+function loadH2H() {
+  fetchCSV(URLS.h2h, function(err, rows) {
+    if (err) { showError('h2h'); return; }
+
+    // Find table section and fixture section
+    var tableRows = [];
+    var formRows = [];
+    var inTable = false;
+    var inForm = false;
+
+    rows.forEach(function(r) {
+      if (!r[0]) return;
+      var first = r[0].toString().trim();
+      if (first === 'Pos') { inTable = true; inForm = false; return; }
+      if (first === 'Team' && r[1] && r[1].toString().startsWith('GW')) { inTable = false; inForm = true; return; }
+      if (inTable && first && !isNaN(first)) tableRows.push(r);
+      if (inForm && first && !first.startsWith('GW')) formRows.push(r);
+    });
+
+    // H2H table
+    var body = '';
+    tableRows.forEach(function(t, i) {
+      var pos = parseInt(t[0]) || (i+1);
+      var posCls = pos === 1 ? 'pos-1' : pos === 2 ? 'pos-2' : pos === 3 ? 'pos-3' : 'pos-n';
+      body += '<tr><td><span class="pos-badge ' + posCls + '">' + pos + '</span></td>' +
+              '<td class="team-name">' + (t[1]||'') + '</td>' +
+              '<td class="num">' + (t[2]||'') + '</td>' +
+              '<td class="num" style="color:var(--win)">' + (t[3]||'') + '</td>' +
+              '<td class="num" style="color:var(--draw)">' + (t[4]||'') + '</td>' +
+              '<td class="num" style="color:var(--loss)">' + (t[5]||'') + '</td>' +
+              '<td class="num">' + (t[6]||'') + '</td>' +
+              '<td class="num">' + (t[7]||'') + '</td>' +
+              '<td class="num">' + (t[8]||'') + '</td>' +
+              '<td class="num" style="font-weight:600;color:var(--accent)">' + (t[9]||'') + '</td></tr>';
+    });
+    document.getElementById('h2h-table-body').innerHTML = body;
+
+    // Form grid — read from gameweek scores tab
+    fetchCSV(URLS.gameweekScores, function(err2, gwRows) {
+      if (!err2 && gwRows.length > 1) {
+        var shortNames = gwRows[0].slice(1).filter(Boolean);
+        var dataRows = gwRows.slice(1).filter(function(r) {
+          return r[0] && r[0].toString().startsWith('GW');
+        }).slice(0, 36);
+
+        var grid = document.getElementById('h2h-form-grid');
+        var headerRow = '<tr><th>Team</th>';
+        dataRows.forEach(function(r) { headerRow += '<th>' + r[0] + '</th>'; });
+        headerRow += '</tr>';
+
+        var gridBody = '';
+        shortNames.forEach(function(name) {
+          gridBody += '<tr><td class="team-label">' + name + '</td>';
+          dataRows.forEach(function(gwRow, gwIdx) {
+            var myScore = parseFloat(gwRow[shortNames.indexOf(name)+1]) || 0;
+            if (myScore === 0) { gridBody += '<td class="cell-blank">-</td>'; return; }
+            // Find opponent score for this GW
+            var maxOpp = 0;
+            shortNames.forEach(function(opp, j) {
+              if (opp === name) return;
+              var s = parseFloat(gwRow[j+1]) || 0;
+              if (s > maxOpp) maxOpp = s;
+            });
+            // Simple W/D/L based on whether this team won that week
+            var scores = shortNames.map(function(_, j) { return parseFloat(gwRow[j+1]) || 0; }).filter(function(s){return s>0;});
+            scores.sort(function(a,b){return b-a;});
+            var rank = scores.indexOf(myScore);
+            var cls = rank === 0 ? 'cell-w' : rank === scores.length-1 ? 'cell-l' : 'cell-d';
+            var letter = rank === 0 ? 'W' : rank === scores.length-1 ? 'L' : 'D';
+            gridBody += '<td class="' + cls + '">' + letter + '</td>';
+          });
+          gridBody += '</tr>';
+        });
+
+        grid.innerHTML = headerRow + gridBody;
+      }
+
+      document.getElementById('h2h-loading').style.display = 'none';
+      document.getElementById('h2h-content').style.display = 'block';
+    });
+  });
+}
+
+// ============================================================
+// CUP PAGE
+// ============================================================
+function loadCup() {
+  fetchCSV(URLS.cupGS, function(err, rows) {
+    if (err) { showError('cup'); return; }
+
+    var groupA = []; var groupB = []; var inA = false; var inB = false;
+    rows.forEach(function(r) {
+      if (!r[0]) return;
+      var first = r[0].toString();
+      if (first.includes('Group A')) { inA = true; inB = false; return; }
+      if (first.includes('Group B')) { inA = false; inB = true; return; }
+      if (first === 'Pos') return;
+      if (!isNaN(first) && first !== '') {
+        if (inA) groupA.push(r);
+        else if (inB) groupB.push(r);
+      }
+    });
+
+    function renderGroup(data, bodyId) {
+      var body = '';
+      data.forEach(function(t, i) {
+        var qual = i < 3;
+        var top = i === 0;
+        var style = top ? 'style="background:rgba(255,215,0,0.05)"' :
+                    qual ? 'style="background:rgba(0,229,160,0.04)"' : '';
+        body += '<tr ' + style + '>' +
+                '<td style="padding:10px 14px;font-weight:' + (top?'600':'400') + ';color:' + (top?'var(--gold)':'var(--text)') + '">' +
+                (i+1) + '. ' + (t[1]||'') + (qual ? ' <span style="font-size:10px;color:var(--accent)">✓</span>' : '') + '</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2)">' + (t[2]||'') + '</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-size:12px;color:var(--win)">' + (t[3]||'') + '</td>' +
+                '<td style="padding:10px 14px;text-align:right;font-family:\'DM Mono\',monospace;font-size:13px;font-weight:600;color:var(--accent)">' + (t[9]||'') + '</td>' +
+                '</tr>';
+      });
+      document.getElementById(bodyId).innerHTML = body;
+    }
+
+    renderGroup(groupA, 'cup-group-a');
+    renderGroup(groupB, 'cup-group-b');
+
+    // KO section - placeholder showing structure
+    document.getElementById('cup-ko-section').innerHTML =
+      '<div class="ko-bracket">' +
+      '<div style="display:flex;gap:2rem;justify-content:center;flex-wrap:wrap">' +
+      koColumn('Playoff (GW32)', [
+        { home: '2nd Group A', hScore: '', away: '3rd Group B', aScore: '' },
+        { home: '3rd Group A', hScore: '', away: '2nd Group B', aScore: '' }
+      ]) +
+      koColumn('Semi-Finals (GW36)', [
+        { home: '1st Group A', hScore: '', away: 'PO Winner', aScore: '' },
+        { home: '1st Group B', hScore: '', away: 'PO Winner', aScore: '' }
+      ]) +
+      koColumn('Final (GW38)', [
+        { home: 'SF Winner', hScore: '', away: 'SF Winner', aScore: '' }
+      ]) +
+      '</div></div>';
+
+    document.getElementById('cup-loading').style.display = 'none';
+    document.getElementById('cup-content').style.display = 'block';
+  });
+}
+
+function koColumn(title, matches) {
+  var html = '<div><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;text-align:center">' + title + '</div>';
+  matches.forEach(function(m) {
+    html += '<div class="ko-match" style="margin-bottom:8px">' +
+            '<div class="ko-team"><span>' + m.home + '</span><span class="score">' + (m.hScore||'-') + '</span></div>' +
+            '<div class="ko-divider"></div>' +
+            '<div class="ko-team"><span>' + m.away + '</span><span class="score">' + (m.aScore||'-') + '</span></div>' +
+            '</div>';
+  });
+  return html + '</div>';
+}
+
+// ============================================================
+// SQUADS PAGE
+// ============================================================
+function loadSquads() {
+  fetchCSV(URLS.transferList, function(err, rows) {
+    if (err) { showError('squads'); return; }
+
+    var headers = rows[0];
+    var idIdx = headers.indexOf('ID');
+    var webIdx = headers.indexOf('Web Name');
+    var posIdx = headers.indexOf('Position');
+    var clubIdx = headers.indexOf('Club');
+    var ptsIdx = headers.indexOf('Total Points');
+    var teamIdx = headers.indexOf('Team Owned');
+    var feeIdx = headers.indexOf('Fee (£m)');
+
+    var squads = {};
+    rows.slice(1).forEach(function(r) {
+      var team = r[teamIdx];
+      if (!team) return;
+      if (!squads[team]) squads[team] = { players: [], total: 0 };
+      squads[team].players.push({
+        id: r[idIdx], web: r[webIdx], pos: r[posIdx],
+        club: r[clubIdx], pts: parseInt(r[ptsIdx])||0, fee: r[feeIdx]
+      });
+      squads[team].total += parseInt(r[ptsIdx])||0;
+    });
+
+    var posOrder = { GK:1, DEF:2, MID:3, FWD:4 };
+    var html = '';
+    Object.keys(squads).sort().forEach(function(team) {
+      var s = squads[team];
+      s.players.sort(function(a,b) {
+        return (posOrder[a.pos]||5) - (posOrder[b.pos]||5) || b.pts - a.pts;
+      });
+
+      html += '<div class="squad-card"><div class="squad-card-header">' +
+              '<span class="squad-team-name">' + team + '</span>' +
+              '<span class="squad-pts">' + s.total + ' pts</span>' +
+              '</div>';
+
+      s.players.forEach(function(p) {
+        var posCls = p.pos === 'GK' ? 'pos-gk' : p.pos === 'DEF' ? 'pos-def' : p.pos === 'MID' ? 'pos-mid' : 'pos-fwd';
+        var photoUrl = 'https://resources.premierleague.com/premierleague/photos/players/110x140/p' + p.id + '.png';
+        html += '<div class="squad-player">' +
+                '<div class="player-photo"><img src="' + photoUrl + '" onerror="this.parentElement.innerHTML=\'<div class=player-photo-placeholder>' + (p.web||'?').substring(0,2) + '</div>\'" alt="' + p.web + '"></div>' +
+                '<span class="pos-pill ' + posCls + '">' + p.pos + '</span>' +
+                '<span class="player-name">' + p.web + '</span>' +
+                '<span class="player-pts">' + p.pts + 'pts</span>' +
+                '</div>';
+      });
+      html += '</div>';
+    });
+
+    document.getElementById('squad-grid').innerHTML = html || '<p style="color:var(--text3);padding:2rem">No squad data yet. Run Transfer Setup and assign players first.</p>';
+    document.getElementById('squads-loading').style.display = 'none';
+    document.getElementById('squads-content').style.display = 'block';
+  });
+}
+
+// ============================================================
+// LIVE DRAFT PAGE
+// ============================================================
+function loadDraft() {
+  fetchCSV(URLS.transferList, function(err, rows) {
+    if (err) { showError('draft'); return; }
+
+    var headers = rows[0];
+    var webIdx = headers.indexOf('Web Name');
+    var firstIdx = headers.indexOf('First Name');
+    var secIdx = headers.indexOf('Second Name');
+    var posIdx = headers.indexOf('Position');
+    var clubIdx = headers.indexOf('Club');
+    var teamIdx = headers.indexOf('Team Owned');
+    var feeIdx = headers.indexOf('Fee (£m)');
+    var idIdx = headers.indexOf('ID');
+
+    var budget = 100;
+    var limits = { GK:2, DEF:5, MID:5, FWD:3 };
+    var teamData = {};
+    var signings = [];
+
+    rows.slice(1).forEach(function(r) {
+      var team = r[teamIdx]; if (!team) return;
+      if (!teamData[team]) teamData[team] = { spent:0, GK:0, DEF:0, MID:0, FWD:0, total:0 };
+      var fee = parseFloat(r[feeIdx]) || 0;
+      var pos = r[posIdx];
+      teamData[team].spent += fee;
+      teamData[team].total++;
+      if (teamData[team][pos] !== undefined) teamData[team][pos]++;
+      signings.push({ web: r[webIdx], first: r[firstIdx], sec: r[secIdx], pos: pos, club: r[clubIdx], team: team, fee: fee, id: r[idIdx] });
+    });
+
+    // Budget grid
+    var budgetHtml = '';
+    Object.keys(teamData).sort().forEach(function(team) {
+      var d = teamData[team];
+      var pct = Math.min(100, (d.spent / budget) * 100);
+      var remaining = Math.round((budget - d.spent) * 10) / 10;
+      var barColor = pct > 95 ? 'var(--loss)' : pct > 80 ? 'var(--draw)' : 'var(--win)';
+
+      var slots = '';
+      ['GK','DEF','MID','FWD'].forEach(function(pos) {
+        var count = d[pos]; var max = limits[pos];
+        var cls = count > max ? 'over' : count === max ? 'filled' : 'empty';
+        slots += '<span class="pos-slot ' + cls + '">' + pos + ' ' + count + '/' + max + '</span>';
+      });
+
+      budgetHtml += '<div class="budget-card">' +
+                    '<div class="budget-team"><span>' + team + '</span><span class="budget-remaining">£' + remaining + 'm left</span></div>' +
+                    '<div class="budget-bar-wrap"><div class="budget-bar" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
+                    '<div class="pos-tracker">' + slots + '</div></div>';
+    });
+    document.getElementById('budget-grid').innerHTML = budgetHtml || '<p style="color:var(--text3)">No transfer data yet.</p>';
+
+    // Signing feed — most recent first
+    signings.reverse();
+    var feedHtml = '';
+    if (!signings.length) {
+      feedHtml = '<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px">No signings yet — draft night incoming! 🎯</div>';
+    } else {
+      signings.slice(0, 20).forEach(function(s) {
+        var photoUrl = 'https://resources.premierleague.com/premierleague/photos/players/110x140/p' + s.id + '.png';
+        var posCls = s.pos === 'GK' ? 'pos-gk' : s.pos === 'DEF' ? 'pos-def' : s.pos === 'MID' ? 'pos-mid' : 'pos-fwd';
+        feedHtml += '<div class="signing-item">' +
+                    '<div class="signing-photo"><img src="' + photoUrl + '" onerror="this.style.display=\'none\'" alt="' + s.web + '"></div>' +
+                    '<div class="signing-info">' +
+                    '<div class="signing-name">' + s.web + ' <span class="pos-pill ' + posCls + '" style="font-size:10px">' + s.pos + '</span></div>' +
+                    '<div class="signing-detail">' + s.first + ' ' + s.sec + ' · ' + s.club + ' → <span style="color:var(--text)">' + s.team + '</span></div>' +
+                    '</div>' +
+                    '<div style="text-align:right"><div class="signing-fee">£' + s.fee + 'm</div>' +
+                    '</div></div>';
+      });
+    }
+    document.getElementById('signing-feed-items').innerHTML = feedHtml;
+
+    document.getElementById('draft-loading').style.display = 'none';
+    document.getElementById('draft-content').style.display = 'block';
+  });
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function showError(page) {
+  document.getElementById(page + '-loading').style.display = 'none';
+  document.getElementById(page + '-content').innerHTML =
+    '<div class="error-msg">Could not load data. Make sure your Google Sheet is published and the URLs are correct.</div>';
+  document.getElementById(page + '-content').style.display = 'block';
+}
+
+// Auto-refresh every 60 seconds
+setInterval(function() {
+  cache = {};
+  loadPage(currentPage);
+}, 60000);
+
+// Initial load
+loadHome();
+</script>
+</body>
+</html>
