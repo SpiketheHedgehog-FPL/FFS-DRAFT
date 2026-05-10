@@ -134,11 +134,11 @@ td.pad-bar{padding-left:18px;}
 .sl-bar{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 16px;margin-bottom:1rem;font-size:13px;display:none;}
 .sl-bar.has{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .portal-wrap{background:var(--nfl-dark);min-height:calc(100vh - 136px);margin:-1.5rem -2rem;padding:0;}
-.ssn-bar{background:var(--ssn-yellow);overflow:hidden;display:flex;align-items:center;height:44px;width:100%;}
-.ssn-lbl{background:#111;color:var(--ssn-yellow);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;padding:0 16px;white-space:nowrap;letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;flex-shrink:0;}
-.ssn-scroll{overflow:hidden;flex:1;display:flex;align-items:center;min-width:0;}
-.ssn-txt{display:inline-block;white-space:nowrap;animation:ticker 45s linear infinite;font-size:13px;font-weight:800;color:#111;padding-left:40px;font-family:'Barlow',sans-serif;}
-@keyframes ticker{0%{transform:translateX(100%)}100%{transform:translateX(-200%)}}
+..ssn-bar{background:var(--ssn-yellow);display:flex;align-items:stretch;height:44px;width:100%;overflow:hidden;}
+.ssn-lbl{background:#111;color:var(--ssn-yellow);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;padding:0 16px;white-space:nowrap;letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;flex-shrink:0;z-index:2;}
+.ssn-scroll{flex:1;overflow:hidden;position:relative;display:flex;align-items:center;height:100%;}
+.ssn-txt{position:absolute;white-space:nowrap;animation:ssntick 50s linear infinite;font-size:13px;font-weight:800;color:#111;font-family:'Barlow',sans-serif;}
+@keyframes ssntick{0%{left:100%}100%{left:-200%}}100%{transform:translateX(-200%)}}
 .portal-nav{background:var(--nfl-dark2);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;padding:0 2rem;overflow-x:auto;}
 .p-btn{padding:14px 22px;background:none;border:none;border-bottom:3px solid transparent;color:rgba(255,255,255,0.5);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;margin-bottom:-1px;text-transform:uppercase;letter-spacing:0.5px;transition:all 0.2s;}
 .p-btn.active{color:var(--rsm-green);border-bottom-color:var(--rsm-green);}
@@ -358,7 +358,7 @@ td.pad-bar{padding-left:18px;}
 <div class="modal-ov" id="p-modal" onclick="closeModal(event)"><div class="modal" id="modal-inner"></div></div>
 <script>
 var B='https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?single=true&output=csv&gid=';
-var S={query1:B+'0',gwScores:B+'1469042968',leagueTable:B+'30663119',h2h:B+'800583406',h2hKO:B+'1027861412',h2hGW:B+'379347250',cupGS:B+'579700582',cupKO:B+'502965535',transferList:B+'474568309',playerData:B+'399891851',rulesChecker:B+'1914416468',teams:{'Ben L':B+'2131430857','Adam S':B+'1622007174','Danny C':B+'976583926','Habeel K':B+'724825281','Josh R':B+'1371701033','Jamie S':B+'1248493649','Hugo H':B+'1550672397','Chris W':B+'610927521','Max W':B+'670115446','Pietro P':B+'1347514932'}};
+var S={query1:B+'0',gwScores:B+'1469042968',leagueTable:B+'30663119',h2h:B+'800583406',h2hKO:B+'502965535',h2hGW:B+'379347250',cupGS:B+'579700582',cupKO:B+'1027861412',transferList:B+'474568309',playerData:B+'399891851',rulesChecker:B+'1914416468',teams:{'Ben L':B+'2131430857','Adam S':B+'1622007174','Danny C':B+'976583926','Habeel K':B+'724825281','Josh R':B+'1371701033','Jamie S':B+'1248493649','Hugo H':B+'1550672397','Chris W':B+'610927521','Max W':B+'670115446','Pietro P':B+'1347514932'}};
 var PL_COLOURS={'Arsenal':'#EF0107','Aston Villa':'#670E36','Bournemouth':'#DA291C','Brentford':'#e30613','Brighton':'#0057B8','Burnley':'#6C1D45','Chelsea':'#034694','Crystal Palace':'#1B458F','Everton':'#003399','Fulham':'#000000','Leeds':'#FFCD00','Liverpool':'#C8102E','Man City':'#6CADDF','Man Utd':'#DA291C','Newcastle':'#241F20',"Nott'm Forest":'#DD0000','Sunderland':'#EB172B','Spurs':'#132257','West Ham':'#7A263A','Wolves':'#FDB913','ARS':'#EF0107','AVL':'#670E36','BOU':'#DA291C','BRE':'#e30613','BRI':'#0057B8','BUR':'#6C1D45','CHE':'#034694','CRY':'#1B458F','EVE':'#003399','FUL':'#000000','LEE':'#FFCD00','LIV':'#C8102E','MCI':'#6CADDF','MUN':'#DA291C','NEW':'#241F20','NFO':'#DD0000','SUN':'#EB172B','TOT':'#132257','WHU':'#7A263A','WOL':'#FDB913'};
 var TEAM_COLOURS={'Ben L':{cls:'sq-ben'},'Adam S':{cls:'sq-adam'},'Danny C':{cls:'sq-danny'},'Habeel K':{cls:'sq-habeel'},'Josh R':{cls:'sq-josh'},'Jamie S':{cls:'sq-jamie'},'Hugo H':{cls:'sq-hugo'},'Chris W':{cls:'sq-chris'},'Max W':{cls:'sq-max'},'Pietro P':{cls:'sq-pietro'}};
 var TEAM_BG={'Ben L':'#1C6FB8','Adam S':'#003087','Danny C':'#B8860B','Habeel K':'#C8102E','Josh R':'#6B2D6B','Jamie S':'#003087','Hugo H':'#003087','Chris W':'#003087','Max W':'#111','Pietro P':'#009246'};
@@ -370,7 +370,18 @@ function parseCSV(txt){var lines=txt.trim().split('\n');return lines.map(functio
 function fetchCSV(url,cb){if(cache[url]){cb(null,cache[url]);return;}fetch(url).then(function(r){return r.text();}).then(function(t){cache[url]=parseCSV(t);cb(null,cache[url]);}).catch(function(e){cb(e,null);});}
 
 function loadCodeMap(cb){if(Object.keys(idToCode).length>0){cb();return;}fetchCSV(S.query1,function(err,rows){if(err){cb();return;}var h=rows[0];var idIdx=-1;var codeIdx=-1;var webIdx=-1;var secIdx=-1;for(var i=0;i<h.length;i++){if(h[i]&&h[i].toString().includes('.id')&&h[i].toString().includes('Column'))idIdx=i;if(h[i]&&h[i].toString().includes('.code')&&h[i].toString().includes('Column'))codeIdx=i;}if(idIdx<0)for(var i=0;i<h.length;i++){if(h[i]==='Column1.id')idIdx=i;if(h[i]==='Column1.code')codeIdx=i;if(h[i]==='Column1.web_name')webIdx=i;if(h[i]==='Column1.second_name')secIdx=i;}rows.slice(1).forEach(function(r){var id=r[idIdx];var code=r[codeIdx];if(id&&code){idToCode[id.toString()]=code.toString();if(webIdx>=0){var wb=(r[webIdx]||'').toString().toLowerCase().trim();if(wb)idToCode['web:'+wb]=code.toString();}if(secIdx>=0){var sc=(r[secIdx]||'').toString().toLowerCase().trim();if(sc)idToCode['sec:'+sc]=code.toString();}}});cb();});}
-function photoUrl(id,name){var code=idToCode[id?id.toString():''];if(!code&&name){var nl=name.toString().toLowerCase().trim();code=idToCode['web:'+nl]||idToCode['sec:'+nl.split(' ').pop()]||'';}if(!code)return null;return 'https://resources.premierleague.com/premierleague/photos/players/110x140/p'+code+'.png';}
+function photoUrl(id,name){
+  var code=idToCode[id?id.toString():''];
+  if(!code&&name){
+    var nl=name.toString().toLowerCase().trim();
+    var parts=nl.split(' ');
+    var last=parts[parts.length-1];
+    var first=parts[0];
+    code=idToCode['web:'+nl]||idToCode['sec:'+last]||idToCode['web:'+last]||idToCode['web:'+first]||'';
+  }
+  if(!code)return null;
+  return 'https://resources.premierleague.com/premierleague/photos/players/110x140/p'+code+'.png';
+}
 function photoEl(id,size,initials){size=size||34;var url=photoUrl(id,initials);var fb=initials?initials.toString().substring(0,2):'?';var fs=size<=28?9:11;var s='width:'+size+'px;height:'+size+'px;border-radius:50%;background:linear-gradient(135deg,var(--rsm-green),var(--rsm-blue));border:2px solid rgba(0,0,0,0.1);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;font-size:'+fs+'px;font-weight:800;color:white;flex-shrink:0;vertical-align:middle;';if(url)return '<div style="'+s+'"><img src="'+url+'" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'" alt=""><span style="display:none;position:absolute">'+fb+'</span></div>';return '<div style="'+s+'">'+fb+'</div>';}
 
 function showPage(name,btn){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});document.getElementById('page-'+name).classList.add('active');if(btn)btn.classList.add('active');loadPage(name);}
