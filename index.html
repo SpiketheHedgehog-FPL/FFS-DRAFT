@@ -133,7 +133,8 @@ td.pad-bar{padding-left:18px;}
 .search-in:focus{border-color:var(--rsm-green);}
 .sl-bar{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 16px;margin-bottom:1rem;font-size:13px;display:none;}
 .sl-bar.has{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.portal-wrap{background:var(--nfl-dark);min-height:calc(100vh - 136px);margin:-1.5rem -2rem;padding:0;}}100%{transform:translateX(-200%)}}
+.portal-wrap{background:var(--nfl-dark);min-height:calc(100vh - 136px);margin:-1.5rem -2rem;padding:0;overflow:hidden;}
+.100%{left:-200%}}100%{transform:translateX(-200%)}}
 .portal-nav{background:var(--nfl-dark2);border-bottom:1px solid rgba(255,255,255,0.08);display:flex;padding:0 2rem;overflow-x:auto;}
 .p-btn{padding:14px 22px;background:none;border:none;border-bottom:3px solid transparent;color:rgba(255,255,255,0.5);font-family:'Barlow',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;margin-bottom:-1px;text-transform:uppercase;letter-spacing:0.5px;transition:all 0.2s;}
 .p-btn.active{color:var(--rsm-green);border-bottom-color:var(--rsm-green);}
@@ -364,44 +365,16 @@ var cache={};var idToCode={};var allPlayers=[];var allAvail=[];var allSigned=[];
 function parseCSV(txt){var lines=txt.trim().split('\n');return lines.map(function(line){var row=[];var cell='';var q=false;for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'){q=!q;}else if(c===','&&!q){row.push(cell.trim());cell='';}else cell+=c;}row.push(cell.trim());return row;});}
 function fetchCSV(url,cb){if(cache[url]){cb(null,cache[url]);return;}fetch(url).then(function(r){return r.text();}).then(function(t){cache[url]=parseCSV(t);cb(null,cache[url]);}).catch(function(e){cb(e,null);});}
 
-function loadCodeMap(cb){if(Object.keys(idToCode).length>0){cb();return;}fetchCSV(S.query1,function(err,rows){if(err){cb();return;}var h=rows[0];var idIdx=-1;var codeIdx=-1;var webIdx=-1;var secIdx=-1;var firstIdx=-1;for(var i=0;i<h.length;i++){if(h[i]&&h[i].toString().includes('.id')&&h[i].toString().includes('Column'))idIdx=i;if(h[i]&&h[i].toString().includes('.code')&&h[i].toString().includes('Column'))codeIdx=i;}if(idIdx<0)for(var i=0;i<h.length;i++){if(h[i]==='Column1.id')idIdx=i;if(h[i]==='Column1.code')codeIdx=i;if(h[i]==='Column1.web_name')webIdx=i;if(h[i]==='Column1.second_name')secIdx=i;if(hh==='Column1.first_name')firstIdx=i;}rows.slice(1).forEach(function(r){
-  var id=r[idIdx];var code=r[codeIdx];
-  if(id&&code){
-    idToCode[id.toString()]=code.toString();
-    if(webIdx>=0){var wb=(r[webIdx]||'').toString().toLowerCase().trim();if(wb)idToCode['web:'+wb]=code.toString();}
-    if(secIdx>=0){
-      var sc=(r[secIdx]||'').toString().toLowerCase().trim();
-      if(sc){
-        idToCode['sec:'+sc]=code.toString();
-        // also normalised version
-        var scn=sc.normalize('NFD').replace(/[̀-ͯ]/g,'');
-        idToCode['sec:'+scn]=code.toString();
-      }
-    }
-    if(firstIdx>=0&&secIdx>=0){
-      var fn=(r[firstIdx]||'').toString().toLowerCase().trim();
-      var sn=(r[secIdx]||'').toString().toLowerCase().trim();
-      var full=fn+' '+sn;
-      if(full.trim()){
-        idToCode['full:'+full]=code.toString();
-        var fulln=full.normalize('NFD').replace(/[̀-ͯ]/g,'');
-        idToCode['full:'+fulln]=code.toString();
-      }
-    }
-  }
-});cb();});}
+function loadCodeMap(cb){if(Object.keys(idToCode).length>0){cb();return;}fetchCSV(S.query1,function(err,rows){if(err){cb();return;}var h=rows[0];var idIdx=-1;var codeIdx=-1;var webIdx=-1;var secIdx=-1;var firstIdx=-1;for(var i=0;i<h.length;i++){if(h[i]&&h[i].toString().includes('.id')&&h[i].toString().includes('Column'))idIdx=i;if(h[i]&&h[i].toString().includes('.code')&&h[i].toString().includes('Column'))codeIdx=i;}if(idIdx<0)for(var i=0;i<h.length;i++){if(h[i]==='Column1.id')idIdx=i;if(h[i]==='Column1.code')codeIdx=i;if(h[i]==='Column1.web_name')webIdx=i;if(h[i]==='Column1.second_name')secIdx=i;if(hh==='Column1.first_name')firstIdx=i;}rows.slice(1).forEach(function(r){var id=r[idIdx];var code=r[codeIdx];if(id&&code){idToCode[id.toString()]=code.toString();if(webIdx>=0){var wb=(r[webIdx]||'').toString().toLowerCase().trim();if(wb)idToCode['web:'+wb]=code.toString();}if(secIdx>=0){var sc=(r[secIdx]||'').toString().toLowerCase().trim();if(sc)idToCode['sec:'+sc]=code.toString();}if(firstIdx>=0&&secIdx>=0){var fn=(r[firstIdx]||'').toString().toLowerCase().trim();var sn=(r[secIdx]||'').toString().toLowerCase().trim();if(fn&&sn)idToCode['full:'+fn+' '+sn]=code.toString();}}});cb();});}
 function photoUrl(id,name){
   var code=idToCode[id?id.toString():''];
   if(!code&&name){
     var nl=name.toString().toLowerCase().trim();
-    var nln=nl.normalize('NFD').replace(/[̀-ͯ]/g,'');
-    var parts=nln.split(' ');
+    var parts=nl.split(' ');
     var last=parts[parts.length-1];
     var first=parts[0];
-    code=idToCode['web:'+nl]||idToCode['web:'+nln]||
-         idToCode['sec:'+last]||idToCode['web:'+last]||
-         idToCode['full:'+nl]||idToCode['full:'+nln]||
-         idToCode['web:'+first]||'';
+    var full=parts.slice(0,2).join(' ');
+    code=idToCode['web:'+nl]||idToCode['sec:'+last]||idToCode['web:'+last]||idToCode['full:'+full]||idToCode['web:'+first]||'';
   }
   if(!code)return null;
   return 'https://resources.premierleague.com/premierleague/photos/players/110x140/p'+code+'.png';
