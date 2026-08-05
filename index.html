@@ -90,7 +90,9 @@ img{display:block;max-width:100%}
 .lt-mast{position:relative;height:88px;overflow:hidden}
 .lt-mast .bands{position:absolute;inset:0}
 .lt-mast .bands i{position:absolute;top:-40px;bottom:-40px;display:block;transform:skewX(-24deg)}
-.lt-mast .copy{position:relative;height:100%;display:flex;align-items:center;padding-left:24px}
+.lt-mast .copy{position:relative;height:100%;display:flex;align-items:center;gap:15px;padding-left:24px}
+.lt-slot{width:46px;height:46px;border:1px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:8px;font-weight:700;letter-spacing:.8px;color:rgba(255,255,255,.7);overflow:hidden}
+.lt-slot img{width:100%;height:100%;object-fit:contain}
 .lt-mast h1{font-size:31px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1}
 .lt-mast p{font-size:9px;font-weight:800;letter-spacing:1.8px;color:rgba(255,255,255,.8);margin-top:4px}
 .lt-sub{height:32px;display:flex;align-items:flex-end;padding-left:24px}
@@ -119,6 +121,92 @@ img{display:block;max-width:100%}
 .c-form{width:88px;text-align:right;white-space:nowrap}
 .fs{display:inline-block;min-width:15px;text-align:center;font-size:9px;font-weight:800;padding:2px;margin-left:2px}
 .note{margin:0 20px 22px;padding:11px 14px;background:#f7f9fb;border:1px solid var(--line);font-size:11px;color:var(--ink2);line-height:1.5}
+
+/* ---------- H2H ---------- */
+.h2h{background:#0B1340;min-height:520px}
+.h2h-nav{display:flex;gap:0;padding:0 16px;background:#070C2B}
+.h2h-nav button{background:none;border:none;border-bottom:3px solid transparent;color:rgba(255,255,255,.5);
+  font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  padding:13px 15px;cursor:pointer}
+.h2h-nav button.on{color:#fff;border-bottom-color:#00E5FF}
+.h2h-mast{display:flex;align-items:center;gap:13px;padding:16px 18px 14px}
+.h2h-slot{width:44px;height:44px;border:1px dashed rgba(255,255,255,.45);display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:7px;font-weight:700;letter-spacing:.7px;color:rgba(255,255,255,.5);overflow:hidden}
+.h2h-slot img{width:100%;height:100%;object-fit:contain}
+.h2h-mast h2{font-size:18px;font-weight:900;color:#fff;letter-spacing:.4px;line-height:1}
+.h2h-mast p{font-size:8px;font-weight:700;letter-spacing:1.5px;color:#00E5FF;margin-top:3px}
+.h2h-mast .r{margin-left:auto;text-align:right}
+.h2h-mast .r span{display:block;font-size:8px;font-weight:800;letter-spacing:1.2px;color:rgba(255,255,255,.45)}
+.h2h-mast .r b{display:block;font-size:14px;font-weight:900;color:#00E5FF;margin-top:2px}
+.h2h-view{display:none}
+.h2h-view.on{display:block}
+.h2h-wrap{display:flex}
+.h2h-word{width:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.h2h-word span{writing-mode:vertical-rl;transform:rotate(180deg);font-size:27px;font-weight:900;color:#fff;white-space:nowrap}
+.h2h-body{flex:1;min-width:0;padding:0 0 16px}
+.h2h-zones{width:26px;flex-shrink:0;position:relative}
+.h2h-zone{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center}
+.h2h-zone span{writing-mode:vertical-rl;font-size:9px;font-weight:900;letter-spacing:1.5px;white-space:nowrap}
+.hh{display:flex;align-items:center;gap:6px;padding:0 12px 6px 0;font-size:8px;font-weight:800;letter-spacing:.9px;color:rgba(255,255,255,.5)}
+.hr{display:flex;align-items:center;gap:6px;padding:6px 12px 6px 0;cursor:pointer}
+.hr:nth-child(odd){background:#0F1749}
+.hr:nth-child(even){background:#16205F}
+.h-pos{width:24px;text-align:center}
+.h-pos b{display:inline-block;min-width:20px;padding:2px 0;font-size:13px;font-weight:900;letter-spacing:-.5px}
+.h-ph{width:28px}
+.h-ph .ph{background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.55);color:#fff}
+.h-nm{flex:1;min-width:0;font-size:13px;font-weight:800;color:#fff;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-n{text-align:right;font-size:11px;color:rgba(255,255,255,.55)}
+.h-pts{width:26px;text-align:center}
+.h-pts b{display:inline-block;min-width:24px;padding:2px 0;font-size:13px;font-weight:900;color:#1E3AE0;letter-spacing:-.5px}
+.h-form{width:78px;text-align:right;white-space:nowrap}
+.h-form i{display:inline-block;width:13px;height:14px;line-height:14px;text-align:center;font-size:8px;font-weight:900;
+  color:#0B1340;margin-left:2px;font-style:normal}
+.h-chev{width:10px;text-align:right;font-size:10px;color:rgba(255,255,255,.45)}
+.h-cut{height:3px;background:#FF3D9E}
+.h-open{background:#070C2B;padding:12px 14px 10px}
+.h-open .lbl{font-size:8px;font-weight:900;letter-spacing:1.4px;color:#00E5FF;margin-bottom:8px}
+.h-grid i{display:inline-block;width:12px;height:16px;line-height:16px;text-align:center;font-size:8px;font-weight:900;
+  color:#070C2B;margin-right:1px;margin-bottom:2px;font-style:normal}
+.h-streaks{display:flex;gap:22px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15)}
+.h-streaks b{display:block;font-size:19px;font-weight:900;letter-spacing:-.5px}
+.h-streaks span{display:block;font-size:8px;font-weight:800;letter-spacing:1.1px;color:rgba(255,255,255,.5);margin-top:2px}
+.h2h-pad{padding:0 18px 18px}
+.rnav{display:flex;align-items:center;gap:8px;margin-bottom:13px}
+.rnav .b{width:26px;height:26px;border:1px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:13px}
+.rnav .lab{font-size:15px;font-weight:900;color:#FF3D9E;min-width:70px;text-align:center}
+.fxgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.srow{display:flex;align-items:center;background:#16205F;padding:9px 12px}
+.srow .nm{flex:1;font-size:12px;font-weight:800;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .sc{display:flex;flex-direction:column;align-items:center;width:30px;flex-shrink:0}
+.srow .sc b{font-size:16px;font-weight:900;letter-spacing:-.5px;line-height:1.05}
+.srow .sc i{display:block;height:3px;width:20px;margin-top:3px}
+.srow .ft{font-size:10px;font-weight:700;color:rgba(255,255,255,.35);margin:0 5px;align-self:flex-start;padding-top:3px}
+.srow .av{width:24px;height:24px;flex-shrink:0;margin:0 8px}
+.rec-pick{display:flex;align-items:stretch;gap:10px;margin-bottom:14px}
+.rec-pick .side{flex:1;background:#16205F;padding:12px;text-align:center}
+.rec-pick select{width:100%;background:#0B1340;color:#fff;border:1px solid rgba(255,255,255,.25);font-family:inherit;
+  font-size:12px;font-weight:800;padding:5px;outline:none}
+.rec-vs{width:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#FF3D9E}
+.rec-bar{display:flex;height:32px;margin-bottom:5px}
+.rec-bar div{display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#0B1340}
+.rec-lbl{display:flex;justify-content:space-between;font-size:8px;font-weight:800;letter-spacing:1.1px;color:rgba(255,255,255,.5);margin-bottom:14px}
+.rec-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+.rec-stats div{background:#16205F;padding:11px}
+.rec-stats b{display:block;font-size:16px;font-weight:900;letter-spacing:-.4px}
+.rec-stats span{display:block;font-size:8px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.5);margin-top:3px}
+.rec-m{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.champ{margin-top:16px}
+.champ .strip{display:flex;height:3px}
+.champ .panel{background:#CFD5DC;padding:15px 18px;display:flex;align-items:center;gap:14px}
+.champ .av{width:48px;height:48px;border-radius:50%;background:#5C646E;border:2px solid #EDEFF2;display:flex;align-items:center;
+  justify-content:center;color:#EDEFF2;font-size:15px;font-weight:800;flex-shrink:0;overflow:hidden}
+.champ .av img{width:100%;height:100%;object-fit:cover}
+.champ .lbl{font-size:8px;font-weight:900;letter-spacing:2.2px;color:#5C646E}
+.champ .nm{font-size:27px;font-weight:900;color:#22262B;letter-spacing:-.9px;line-height:1.05;margin-top:1px}
+.champ .tro{width:56px;height:56px;border:1px dashed #8A929C;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;flex-shrink:0;font-size:6px;font-weight:800;letter-spacing:.7px;color:#5C646E;overflow:hidden}
+.champ .tro img{width:100%;height:100%;object-fit:contain}
 
 @media(max-width:820px){
   .shell{flex-direction:column}
@@ -152,6 +240,7 @@ img{display:block;max-width:100%}
   <main class="main">
     <section class="page on" id="p-home"><div class="load"><div class="spin"></div>Loading season data</div></section>
     <section class="page" id="p-league"><div class="load"><div class="spin"></div>Loading league table</div></section>
+    <section class="page" id="p-h2h"><div class="load"><div class="spin"></div>Loading head to head</div></section>
     <section class="page" id="p-stub"></section>
   </main>
 </div>
@@ -364,12 +453,29 @@ function parseKO(rows){
   return { ties: out, champion: champion };
 }
 
+/* H2H form grid: row0 = Team | GW1 | GW2 ... ; rows = team name + W/D/L */
+function parseH2HForm(rows){
+  if (!rows || rows.length < 2) return { gws: [], byName: {} };
+  var gws = rows[0].slice(1).map(function(s){ return String(s).trim(); }).filter(Boolean);
+  var byName = {};
+  rows.slice(1).forEach(function(r){
+    var nm = r[0] ? String(r[0]).trim() : '';
+    if (!nm || nm === 'Team' || nm.indexOf('GW') === 0) return;
+    var vals = [];
+    for (var i = 1; i <= gws.length; i++){
+      vals.push(r[i] ? String(r[i]).trim() : '');
+    }
+    byName[nm] = vals;
+  });
+  return { gws: gws, byName: byName };
+}
+
 /* =====================================================================
    STATE
    ===================================================================== */
 var LEAGUE = CONFIG.leagues[0];
-var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null };
-var loaded = { home:false, league:false };
+var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2hForm:null };
+var loaded = { home:false, league:false, h2h:false };
 var route = 'home';
 
 /* =====================================================================
@@ -378,7 +484,7 @@ var route = 'home';
 var NAV = [
   { key:'home',   label:'Home' },
   { key:'league', label:'League Table' },
-  { key:'h2h',    label:'Head to Head', stub:true },
+  { key:'h2h',    label:'Head to Head' },
   { key:'cup',    label:'FFS Cup',      stub:true },
   { key:'super',  label:'Supercopa',    stub:true },
   { key:'squads', label:'Squads',       stub:true },
@@ -400,10 +506,11 @@ function buildNav(){
 function go(key){
   route = key;
   buildNav();
-  var known = (key === 'home' || key === 'league');
+  var known = (key === 'home' || key === 'league' || key === 'h2h');
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('on'); });
   if (key === 'home')       { document.getElementById('p-home').classList.add('on'); renderHome(); }
   else if (key === 'league'){ document.getElementById('p-league').classList.add('on'); renderLeague(); }
+  else if (key === 'h2h')   { document.getElementById('p-h2h').classList.add('on'); renderH2H(); }
   else {
     var s = document.getElementById('p-stub');
     s.classList.add('on');
@@ -431,10 +538,11 @@ function boot(){
     fetchSheet(LEAGUE,'h2h').then(parseH2H).catch(function(){ return null; }),
     fetchSheet(LEAGUE,'cupGroups').then(parseCupGroups).catch(function(){ return null; }),
     fetchSheet(LEAGUE,'h2hKO').then(parseKO).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'cupKO').then(parseKO).catch(function(){ return null; })
+    fetchSheet(LEAGUE,'cupKO').then(parseKO).catch(function(){ return null; }),
+    fetchSheet(LEAGUE,'h2hForm').then(parseH2HForm).catch(function(){ return null; })
   ]).then(function(res){
     DATA.table = res[0]; DATA.gw = res[1]; DATA.h2h = res[2];
-    DATA.cup = res[3]; DATA.h2hKO = res[4]; DATA.cupKO = res[5];
+    DATA.cup = res[3]; DATA.h2hKO = res[4]; DATA.cupKO = res[5]; DATA.h2hForm = res[6];
     buildNav();
     renderHome();
     buildSidePanels();
@@ -759,6 +867,15 @@ function renderLeague(){
   });
   mast.appendChild(bands);
   var copy = el('div','copy');
+  var slot = el('div','lt-slot');
+  var lsIm = document.createElement('img');
+  lsIm.alt = ''; lsIm.src = CONFIG.img.comp('league');
+  lsIm.addEventListener('error', function(){
+    if (lsIm.parentNode) lsIm.parentNode.removeChild(lsIm);
+    slot.textContent = 'LOGO';
+  });
+  slot.appendChild(lsIm);
+  copy.appendChild(slot);
   var inner = el('div');
   var h1 = el('h1', null, 'Table');
   var p = el('p', null, 'FFS DRAFT - ' + LEAGUE.name.toUpperCase());
@@ -920,6 +1037,511 @@ function tableAt(gw){
   });
   out.sort(function(a,b){ return b.points - a.points; });
   return out;
+}
+
+/* =====================================================================
+   H2H
+   ===================================================================== */
+var H2H_CY = '#00E5FF', H2H_PK = '#FF3D9E';
+var h2hOpen = -1, h2hRound = 0;
+
+/* shared scoreline row - reused by Cup and Supercopa later */
+function scoreRow(home, hs, away, as, colour){
+  var played = hs !== '' && hs !== undefined && hs !== null && as !== '' && as !== undefined && as !== null;
+  var hw = played && num(hs) > num(as);
+  var aw = played && num(as) > num(hs);
+
+  var row = el('div','srow');
+  var n1 = el('span','nm', String(home).toUpperCase());
+  n1.style.textAlign = 'right';
+  n1.style.color = hw || !played ? '#fff' : 'rgba(255,255,255,.55)';
+  row.appendChild(n1);
+
+  var a1 = photo(home, 24); a1.className = 'ph av'; row.appendChild(a1);
+
+  function sc(v, win){
+    var b = el('span','sc');
+    var num1 = el('b', null, played ? String(v) : '-');
+    num1.style.color = win ? colour : played ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.35)';
+    var bar = el('i');
+    bar.style.background = win ? colour : 'transparent';
+    b.appendChild(num1); b.appendChild(bar);
+    return b;
+  }
+  row.appendChild(sc(hs, hw));
+  row.appendChild(el('span','ft', played ? 'FT' : 'V'));
+  row.appendChild(sc(as, aw));
+
+  var a2 = photo(away, 24); a2.className = 'ph av'; row.appendChild(a2);
+
+  var n2 = el('span','nm', String(away).toUpperCase());
+  n2.style.color = aw || !played ? '#fff' : 'rgba(255,255,255,.55)';
+  row.appendChild(n2);
+  return row;
+}
+
+function streaks(arr){
+  var bw=0,cw=0,bu=0,cu=0,bl=0,cl=0;
+  arr.forEach(function(v){
+    if (v !== 'W' && v !== 'D' && v !== 'L') return;
+    cw = v === 'W' ? cw+1 : 0; if (cw > bw) bw = cw;
+    cu = v === 'L' ? 0 : cu+1;  if (cu > bu) bu = cu;
+    cl = v === 'L' ? cl+1 : 0;  if (cl > bl) bl = cl;
+  });
+  return [bw, bu, bl];
+}
+
+function renderH2H(){
+  var host = document.getElementById('p-h2h');
+  if (loaded.h2h) return;
+  if (!DATA.h2h || !DATA.h2h.table.length){
+    clear(host);
+    host.appendChild(el('div','err','Could not load the H2H sheet.'));
+    return;
+  }
+  loaded.h2h = true;
+  clear(host);
+
+  var wrap = el('div','h2h');
+
+  /* sub nav */
+  var nav = el('div','h2h-nav');
+  var views = [['stand','Standings'],['fix','Fixtures'],['rec','The Record'],['ko','Knockout']];
+  views.forEach(function(v, i){
+    var b = document.createElement('button');
+    b.textContent = v[1];
+    b.setAttribute('data-view', v[0]);
+    if (i === 0) b.className = 'on';
+    nav.appendChild(b);
+  });
+  wrap.appendChild(nav);
+
+  /* masthead */
+  var mast = el('div','h2h-mast');
+  var slot = el('div','h2h-slot');
+  var sIm = document.createElement('img');
+  sIm.alt = ''; sIm.src = CONFIG.img.comp('h2h');
+  sIm.addEventListener('error', function(){
+    if (sIm.parentNode) sIm.parentNode.removeChild(sIm);
+    slot.textContent = 'LOGO';
+  });
+  slot.appendChild(sIm);
+  mast.appendChild(slot);
+  var mid = el('div');
+  mid.appendChild(el('h2', null, 'HEAD TO HEAD'));
+  mid.appendChild(el('p', null, 'FFS DRAFT ' + CONFIG.season + ' - GW1-36'));
+  mast.appendChild(mid);
+  var champ = winnerOf(DATA.h2hKO, DATA.h2h.table);
+  if (champ.name){
+    var r = el('div','r');
+    r.appendChild(el('span', null, 'WINNER'));
+    r.appendChild(el('b', null, champ.name.toUpperCase()));
+    mast.appendChild(r);
+  }
+  wrap.appendChild(mast);
+
+  var vStand = el('div','h2h-view on'); vStand.id = 'h2h-stand';
+  var vFix   = el('div','h2h-view');    vFix.id   = 'h2h-fix';
+  var vRec   = el('div','h2h-view');    vRec.id   = 'h2h-rec';
+  var vKo    = el('div','h2h-view');    vKo.id    = 'h2h-ko';
+  wrap.appendChild(vStand); wrap.appendChild(vFix); wrap.appendChild(vRec); wrap.appendChild(vKo);
+  host.appendChild(wrap);
+
+  buildStandings(vStand);
+  buildFixtures(vFix);
+  buildRecord(vRec);
+  buildKnockout(vKo);
+
+  nav.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-view]');
+    if (!b) return;
+    nav.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    wrap.querySelectorAll('.h2h-view').forEach(function(v){ v.classList.remove('on'); });
+    document.getElementById('h2h-' + b.getAttribute('data-view')).classList.add('on');
+  });
+}
+
+/* ---- standings, with expandable full form grid ---- */
+function buildStandings(host){
+  clear(host);
+  var outer = el('div','h2h-wrap');
+
+  var word = el('div','h2h-word');
+  word.appendChild(el('span', null, 'STANDINGS'));
+  outer.appendChild(word);
+
+  var body = el('div','h2h-body');
+  var head = el('div','hh');
+  [['POS',24],['',28],['TEAM','flex'],['W',18],['D',15],['L',15],['PD',32],['PTS',26],['FORM',78],['',10]]
+    .forEach(function(c){
+      var s = el('span', null, c[0]);
+      if (c[1] === 'flex') s.style.flex = '1';
+      else { s.style.width = c[1] + 'px'; s.style.textAlign = c[0] === 'POS' || c[0] === 'PTS' ? 'center' : 'right'; }
+      if (c[0] === 'TEAM') s.style.textAlign = 'left';
+      head.appendChild(s);
+    });
+  body.appendChild(head);
+  var rowsHost = el('div');
+  body.appendChild(rowsHost);
+  outer.appendChild(body);
+
+  var zones = el('div','h2h-zones');
+  var z1 = el('div','h2h-zone'); z1.style.top = '30px'; z1.style.height = '140px';
+  var z1s = el('span', null, 'SEMI-FINALS'); z1s.style.color = H2H_PK; z1.appendChild(z1s);
+  var z2 = el('div','h2h-zone'); z2.style.top = '180px'; z2.style.bottom = '10px';
+  var z2s = el('span', null, 'ELIMINATION'); z2s.style.color = 'rgba(255,255,255,.45)'; z2.appendChild(z2s);
+  zones.appendChild(z1); zones.appendChild(z2);
+  outer.appendChild(zones);
+
+  host.appendChild(outer);
+
+  function paint(){
+    clear(rowsHost);
+    var table = DATA.h2h.table;
+    table.forEach(function(t, i){
+      var pos = i + 1, q = pos <= 4;
+      if (pos === 5) rowsHost.appendChild(el('div','h-cut'));
+
+      var row = el('div','hr');
+      row.setAttribute('data-i', String(i));
+
+      var cp = el('span','h-pos');
+      var b = el('b', null, String(pos));
+      b.style.background = q ? '#FFFFFF' : 'transparent';
+      b.style.color = q ? '#1E3AE0' : 'rgba(255,255,255,.6)';
+      cp.appendChild(b);
+      row.appendChild(cp);
+
+      var ph = el('span','h-ph'); ph.appendChild(photo(t.name)); row.appendChild(ph);
+      row.appendChild(el('span','h-nm', t.name.toUpperCase()));
+
+      [[t.w,18,'#fff'],[t.d,15,'rgba(255,255,255,.55)'],[t.l,15,'rgba(255,255,255,.55)']].forEach(function(c){
+        var s = el('span','h-n', String(c[0]));
+        s.style.width = c[1] + 'px'; s.style.color = c[2];
+        if (c[2] === '#fff') s.style.fontWeight = '700';
+        row.appendChild(s);
+      });
+
+      var pd = el('span','h-n', (t.pd > 0 ? '+' : '') + t.pd);
+      pd.style.width = '32px'; pd.style.fontWeight = '700';
+      pd.style.color = t.pd > 0 ? H2H_CY : H2H_PK;
+      row.appendChild(pd);
+
+      var pts = el('span','h-pts');
+      var pb = el('b', null, String(t.pts));
+      pb.style.background = q ? '#FFFFFF' : H2H_CY;
+      pts.appendChild(pb);
+      row.appendChild(pts);
+
+      var series = DATA.h2hForm && DATA.h2hForm.byName[t.name] ? DATA.h2hForm.byName[t.name] : [];
+      var last5 = series.filter(function(v){ return v === 'W' || v === 'D' || v === 'L'; }).slice(-5);
+      var fm = el('span','h-form');
+      last5.forEach(function(v){
+        var i2 = el('i', null, v);
+        i2.style.background = v === 'W' ? H2H_CY : v === 'D' ? '#FFFFFF' : H2H_PK;
+        fm.appendChild(i2);
+      });
+      row.appendChild(fm);
+
+      var ch = el('span','h-chev', h2hOpen === i ? '\u25B2' : '\u25BC');
+      row.appendChild(ch);
+      rowsHost.appendChild(row);
+
+      if (h2hOpen === i && series.length){
+        var open = el('div','h-open');
+        open.appendChild(el('div','lbl','EVERY GAMEWEEK - GW1 TO GW' + series.length));
+        var grid = el('div','h-grid');
+        series.forEach(function(v, k){
+          var g = el('i', null, v || '');
+          g.title = 'GW' + (k+1) + ': ' + (v || '-');
+          g.style.background = v === 'W' ? H2H_CY : v === 'D' ? '#FFFFFF' : v === 'L' ? H2H_PK : 'rgba(255,255,255,.12)';
+          grid.appendChild(g);
+        });
+        open.appendChild(grid);
+        var st = streaks(series);
+        var sw = el('div','h-streaks');
+        [[st[0],'BEST WIN RUN',H2H_CY],[st[1],'UNBEATEN RUN','#FFFFFF'],[st[2],'WORST RUN',H2H_PK]].forEach(function(c){
+          var d = el('span');
+          var bb = el('b', null, String(c[0])); bb.style.color = c[2];
+          d.appendChild(bb); d.appendChild(el('span', null, c[1]));
+          sw.appendChild(d);
+        });
+        open.appendChild(sw);
+        rowsHost.appendChild(open);
+      }
+    });
+  }
+
+  rowsHost.addEventListener('click', function(e){
+    var r = e.target.closest('.hr[data-i]');
+    if (!r) return;
+    var i = parseInt(r.getAttribute('data-i'), 10);
+    h2hOpen = (h2hOpen === i) ? -1 : i;
+    paint();
+  });
+
+  paint();
+}
+
+/* ---- fixtures by round ---- */
+function buildFixtures(host){
+  clear(host);
+  var pad = el('div','h2h-pad');
+  var byGw = {};
+  DATA.h2h.fixtures.forEach(function(f){
+    if (!byGw[f.gw]) byGw[f.gw] = [];
+    byGw[f.gw].push(f);
+  });
+  var rounds = Object.keys(byGw).map(Number).sort(function(a,b){ return a-b; });
+  if (!rounds.length){
+    pad.appendChild(el('div','h2h-pad','No fixtures found in the H2H sheet.'));
+    host.appendChild(pad);
+    return;
+  }
+  h2hRound = rounds.length - 1;
+
+  var nav = el('div','rnav');
+  var prev = el('span','b','\u2039');
+  var lab = el('span','lab','');
+  var next = el('span','b','\u203A');
+  nav.appendChild(prev); nav.appendChild(lab); nav.appendChild(next);
+  pad.appendChild(nav);
+
+  var grid = el('div','fxgrid');
+  pad.appendChild(grid);
+  host.appendChild(pad);
+
+  function paint(){
+    var gw = rounds[h2hRound];
+    lab.textContent = 'GW' + gw;
+    clear(grid);
+    byGw[gw].forEach(function(f){
+      grid.appendChild(scoreRow(f.home, f.hs, f.away, f.as, H2H_CY));
+    });
+  }
+  prev.addEventListener('click', function(){ if (h2hRound > 0){ h2hRound--; paint(); } });
+  next.addEventListener('click', function(){ if (h2hRound < rounds.length-1){ h2hRound++; paint(); } });
+  paint();
+}
+
+/* ---- the record: every meeting between two managers ---- */
+function buildRecord(host){
+  clear(host);
+  var pad = el('div','h2h-pad');
+  var names = DATA.h2h.table.map(function(t){ return t.name; });
+
+  var pick = el('div','rec-pick');
+  function side(id, ring){
+    var d = el('div','side');
+    var av = el('div');
+    av.style.cssText = 'width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid '
+      + ring + ';display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:#fff;font-size:12px;font-weight:800;overflow:hidden';
+    d.appendChild(av);
+    var sel = document.createElement('select');
+    sel.id = id;
+    names.forEach(function(n){
+      var o = document.createElement('option'); o.textContent = n; sel.appendChild(o);
+    });
+    d.appendChild(sel);
+    d.avatar = av;
+    return d;
+  }
+  var sA = side('recA', H2H_CY), sB = side('recB', H2H_PK);
+  pick.appendChild(sA);
+  pick.appendChild(el('div','rec-vs','VS'));
+  pick.appendChild(sB);
+  pad.appendChild(pick);
+
+  var bar = el('div','rec-bar'); pad.appendChild(bar);
+  var lbl = el('div','rec-lbl'); pad.appendChild(lbl);
+  var stats = el('div','rec-stats'); pad.appendChild(stats);
+  var mtHead = el('div', null, 'ALL MEETINGS');
+  mtHead.style.cssText = 'font-size:8px;font-weight:900;letter-spacing:1.4px;color:' + H2H_CY + ';margin-bottom:8px';
+  pad.appendChild(mtHead);
+  var mts = el('div'); pad.appendChild(mts);
+  host.appendChild(pad);
+
+  sA.querySelector('select').value = names[0];
+  sB.querySelector('select').value = names[1] || names[0];
+
+  function avatar(host2, name){
+    clear(host2);
+    var im = document.createElement('img');
+    im.alt = ''; im.src = CONFIG.img.manager(name);
+    im.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    im.addEventListener('error', function(){
+      if (im.parentNode) im.parentNode.removeChild(im);
+      host2.textContent = name.substring(0,2);
+    });
+    host2.appendChild(im);
+  }
+
+  function paint(){
+    var a = sA.querySelector('select').value, b = sB.querySelector('select').value;
+    avatar(sA.avatar, a); avatar(sB.avatar, b);
+    clear(bar); clear(lbl); clear(stats); clear(mts);
+
+    if (a === b){
+      var msg = el('div', null, 'Pick two different managers');
+      msg.style.cssText = 'padding:24px;text-align:center;color:rgba(255,255,255,.4);font-size:12px';
+      mts.appendChild(msg);
+      return;
+    }
+
+    var ms = DATA.h2h.fixtures.filter(function(f){
+      return (f.home === a && f.away === b) || (f.home === b && f.away === a);
+    });
+
+    var w=0,d=0,l=0,fa=0,fb=0,bigM=0,bigTxt='-';
+    ms.forEach(function(f){
+      var sa = f.home === a ? num(f.hs) : num(f.as);
+      var sb = f.home === a ? num(f.as) : num(f.hs);
+      fa += sa; fb += sb;
+      if (sa > sb) w++; else if (sb > sa) l++; else d++;
+      if (Math.abs(sa-sb) > bigM){ bigM = Math.abs(sa-sb); bigTxt = bigM + ' pts'; }
+    });
+    var tot = Math.max(1, w+d+l);
+
+    [[w, H2H_CY], [d, '#FFFFFF'], [l, H2H_PK]].forEach(function(c){
+      var seg = el('div', null, c[0] ? String(c[0]) : '');
+      seg.style.width = (c[0]/tot*100) + '%';
+      seg.style.background = c[1];
+      bar.appendChild(seg);
+    });
+    lbl.appendChild(el('span', null, a.toUpperCase() + ' WINS'));
+    lbl.appendChild(el('span', null, 'DRAWS'));
+    lbl.appendChild(el('span', null, b.toUpperCase() + ' WINS'));
+
+    var lead = w > l ? a : l > w ? b : 'Level';
+    [[fa + '-' + fb, 'AGGREGATE POINTS', '#fff'], [lead, 'LEADS THE SERIES', H2H_CY], [bigTxt, 'BIGGEST MARGIN', H2H_PK]]
+      .forEach(function(c){
+        var d2 = el('div');
+        var bb = el('b', null, String(c[0])); bb.style.color = c[2];
+        d2.appendChild(bb); d2.appendChild(el('span', null, c[1]));
+        stats.appendChild(d2);
+      });
+
+    if (!ms.length){
+      var none = el('div', null, 'No meetings found');
+      none.style.cssText = 'padding:18px;text-align:center;color:rgba(255,255,255,.4);font-size:12px';
+      mts.appendChild(none);
+      return;
+    }
+
+    ms.forEach(function(f, i){
+      var sa = f.home === a ? f.hs : f.as;
+      var sb = f.home === a ? f.as : f.hs;
+      var row = el('div','rec-m');
+      row.style.background = i % 2 ? '#16205F' : '#0F1749';
+      var g = el('span', null, 'GW' + f.gw);
+      g.style.cssText = 'width:40px;font-size:10px;font-weight:800;color:rgba(255,255,255,.5)';
+      row.appendChild(g);
+      var n1 = el('span', null, a.toUpperCase());
+      n1.style.cssText = 'flex:1;text-align:right;font-size:12px;font-weight:' + (num(sa)>num(sb)?'800':'600')
+        + ';color:' + (num(sa)>num(sb)?'#fff':'rgba(255,255,255,.6)');
+      row.appendChild(n1);
+      var v1 = el('span', null, String(sa));
+      v1.style.cssText = 'min-width:26px;text-align:center;font-size:15px;font-weight:900;color:' + (num(sa)>num(sb)?H2H_CY:'rgba(255,255,255,.5)');
+      row.appendChild(v1);
+      var dash = el('span', null, '-'); dash.style.cssText = 'font-size:10px;color:rgba(255,255,255,.3)';
+      row.appendChild(dash);
+      var v2 = el('span', null, String(sb));
+      v2.style.cssText = 'min-width:26px;text-align:center;font-size:15px;font-weight:900;color:' + (num(sb)>num(sa)?H2H_PK:'rgba(255,255,255,.5)');
+      row.appendChild(v2);
+      var n2 = el('span', null, b.toUpperCase());
+      n2.style.cssText = 'flex:1;font-size:12px;font-weight:' + (num(sb)>num(sa)?'800':'600')
+        + ';color:' + (num(sb)>num(sa)?'#fff':'rgba(255,255,255,.6)');
+      row.appendChild(n2);
+      mts.appendChild(row);
+    });
+  }
+
+  sA.querySelector('select').addEventListener('change', paint);
+  sB.querySelector('select').addEventListener('change', paint);
+  paint();
+}
+
+/* ---- knockout ---- */
+function buildKnockout(host){
+  clear(host);
+  var pad = el('div','h2h-pad');
+
+  if (!DATA.h2hKO || !DATA.h2hKO.ties.length){
+    var none = el('div', null, 'Knockout fixtures not yet available.');
+    none.style.cssText = 'padding:26px;color:rgba(255,255,255,.45);font-size:12px;font-style:italic';
+    pad.appendChild(none);
+    host.appendChild(pad);
+    return;
+  }
+
+  var groups = {};
+  DATA.h2hKO.ties.forEach(function(t){
+    var low = String(t.label).toLowerCase();
+    var key = low.indexOf('semi') >= 0 || low.indexOf('sf') === 0 ? 'SEMI-FINALS - GW37' : 'FINAL - GW38';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+
+  ['SEMI-FINALS - GW37','FINAL - GW38'].forEach(function(k){
+    if (!groups[k]) return;
+    var h = el('div', null, k);
+    h.style.cssText = 'font-size:9px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.9);margin:8px 0 9px';
+    pad.appendChild(h);
+    groups[k].forEach(function(t){
+      var r = scoreRow(t.home, t.hs, t.away, t.as, H2H_CY);
+      r.style.marginBottom = '9px';
+      pad.appendChild(r);
+    });
+  });
+
+  var win = winnerOf(DATA.h2hKO, DATA.h2h.table);
+  if (win.name){
+    var c = el('div','champ');
+    var strip = el('div','strip');
+    var s1 = el('span'); s1.style.cssText = 'flex:1;background:' + H2H_CY;
+    var s2 = el('span'); s2.style.cssText = 'flex:1;background:' + H2H_PK;
+    strip.appendChild(s1); strip.appendChild(s2);
+    c.appendChild(strip);
+
+    var p = el('div','panel');
+    var av = el('div','av');
+    var im = document.createElement('img');
+    im.alt = ''; im.src = CONFIG.img.manager(win.name);
+    im.addEventListener('error', function(){
+      if (im.parentNode) im.parentNode.removeChild(im);
+      av.textContent = win.name.substring(0,2);
+    });
+    av.appendChild(im);
+    p.appendChild(av);
+
+    var m = el('div'); m.style.flex = '1';
+    m.appendChild(el('div','lbl','HEAD TO HEAD CHAMPION'));
+    m.appendChild(el('div','nm', win.name.toUpperCase()));
+    p.appendChild(m);
+
+    var tro = el('div','tro');
+    var tim = document.createElement('img');
+    tim.alt = ''; tim.src = 'img/trophies/h2h.png';
+    tim.addEventListener('error', function(){
+      if (tim.parentNode) tim.parentNode.removeChild(tim);
+      tro.textContent = 'TROPHY';
+    });
+    tro.appendChild(tim);
+    p.appendChild(tro);
+
+    var right = el('div');
+    right.style.textAlign = 'right';
+    var note = el('div', null, win.note || '');
+    note.style.cssText = 'font-size:11px;font-weight:800;letter-spacing:.6px;color:#5C646E';
+    right.appendChild(note);
+    p.appendChild(right);
+
+    c.appendChild(p);
+    pad.appendChild(c);
+  }
+
+  host.appendChild(pad);
 }
 
 /* =====================================================================
