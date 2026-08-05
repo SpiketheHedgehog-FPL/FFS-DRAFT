@@ -521,6 +521,8 @@ function renderHome(){
 
     var row = el('div','comp');
     row.style.borderLeftColor = c.colour;
+    row.style.cursor = 'pointer';
+    row.setAttribute('data-comp', c.key);
     if (winner === '-') row.style.opacity = '.72';
 
     var lg = el('div','comp-logo');
@@ -546,6 +548,12 @@ function renderHome(){
 
     sec.appendChild(row);
   });
+
+  sec.addEventListener('click', function(e){
+    var r = e.target.closest('.comp[data-comp]');
+    if (r) go(r.getAttribute('data-comp'));
+  });
+
   host.appendChild(sec);
 }
 
@@ -569,6 +577,56 @@ function winnerOf(ko, table){
    ===================================================================== */
 var panels = [], panelIdx = 0, panelTimer = null;
 
+/* a competition counts as being at the knockout stage once its KO sheet
+   holds at least one tie with two real teams in it */
+function koActive(ko){
+  if (!ko || !ko.ties || !ko.ties.length) return false;
+  return ko.ties.some(function(t){
+    return t.home && t.away && t.home !== 'TBD' && t.away !== 'TBD';
+  });
+}
+
+function renderKOList(host, ko, colour){
+  var ties = ko.ties.filter(function(t){
+    return t.home && t.away && t.home !== 'TBD' && t.away !== 'TBD';
+  }).slice(-4);
+
+  ties.forEach(function(t){
+    var lab = String(t.label).split('-')[0].trim();
+    var head = el('div', null, lab.toUpperCase());
+    head.style.cssText = 'font-size:9px;font-weight:800;letter-spacing:1px;color:#8a939c;margin:7px 0 3px';
+    host.appendChild(head);
+
+    var played = t.hs !== '' && t.hs !== undefined && t.as !== '' && t.as !== undefined;
+    var hw = played && num(t.hs) > num(t.as);
+    var aw = played && num(t.as) > num(t.hs);
+
+    var box = el('div','sp-fx');
+    [[t.home, t.hs, hw],[t.away, t.as, aw]].forEach(function(side){
+      var line = el('div');
+      var nm = el('span', null, side[0]);
+      nm.style.cssText = 'font-weight:' + (side[2] ? '700' : '500') + ';color:' + (side[2] ? 'var(--ink)' : 'var(--ink2)')
+        + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:96px';
+      var sc = el('span', null, played ? String(side[1]) : '-');
+      sc.style.cssText = 'font-weight:800;color:' + (side[2] ? colour : 'var(--ink3)');
+      line.appendChild(nm); line.appendChild(sc);
+      box.appendChild(line);
+    });
+    host.appendChild(box);
+  });
+
+  if (ko.champion && ko.champion !== 'TBD'){
+    var win = el('div');
+    win.style.cssText = 'margin-top:9px;padding:8px 9px;background:#f7f9fb;border-left:3px solid ' + colour;
+    var l = el('div', null, 'WINNER');
+    l.style.cssText = 'font-size:8px;font-weight:800;letter-spacing:1.1px;color:var(--ink3)';
+    var v = el('div', null, ko.champion);
+    v.style.cssText = 'font-size:14px;font-weight:900;color:var(--ink);margin-top:1px';
+    win.appendChild(l); win.appendChild(v);
+    host.appendChild(win);
+  }
+}
+
 function buildSidePanels(){
   panels = [];
 
@@ -588,37 +646,49 @@ function buildSidePanels(){
   }
 
   if (DATA.h2h && DATA.h2h.table.length){
-    panels.push({ title:'HEAD TO HEAD', colour:'#003399', render:function(host){
-      DATA.h2h.table.slice(0,7).forEach(function(r,i){
-        var row = el('div','sp-row');
-        var mk = i<4 ? '#003399' : 'transparent';
-        var bar = el('span'); bar.style.cssText = 'width:2px;height:15px;background:'+mk;
-        row.appendChild(bar);
-        row.appendChild(el('span','p', String(i+1)));
-        row.appendChild(el('span','n', r.name));
-        row.appendChild(el('span','v', String(r.pts)));
-        host.appendChild(row);
-      });
-    }});
-  }
-
-  if (DATA.cup && (DATA.cup.a.length || DATA.cup.b.length)){
-    panels.push({ title:'FFS CUP', colour:'#CC0000', render:function(host){
-      [['GROUP A', DATA.cup.a], ['GROUP B', DATA.cup.b]].forEach(function(g){
-        var lab = el('div', null, g[0]);
-        lab.style.cssText = 'font-size:9px;font-weight:800;letter-spacing:1px;color:#8a939c;margin:6px 0 3px';
-        host.appendChild(lab);
-        g[1].slice(0,3).forEach(function(r,i){
+    var h2hKnockout = koActive(DATA.h2hKO);
+    panels.push({
+      title: h2hKnockout ? 'HEAD TO HEAD - KO' : 'HEAD TO HEAD',
+      colour: '#003399',
+      render: function(host){
+        if (h2hKnockout) { renderKOList(host, DATA.h2hKO, '#003399'); return; }
+        DATA.h2h.table.slice(0,7).forEach(function(r,i){
           var row = el('div','sp-row');
-          var bar = el('span'); bar.style.cssText = 'width:2px;height:15px;background:' + (i===0?'#CC0000':'#f0a6a6');
+          var mk = i<4 ? '#003399' : 'transparent';
+          var bar = el('span'); bar.style.cssText = 'width:2px;height:15px;background:'+mk;
           row.appendChild(bar);
           row.appendChild(el('span','p', String(i+1)));
           row.appendChild(el('span','n', r.name));
           row.appendChild(el('span','v', String(r.pts)));
           host.appendChild(row);
         });
-      });
-    }});
+      }
+    });
+  }
+
+  if (DATA.cup && (DATA.cup.a.length || DATA.cup.b.length)){
+    var cupKnockout = koActive(DATA.cupKO);
+    panels.push({
+      title: cupKnockout ? 'FFS CUP - KO' : 'FFS CUP',
+      colour: '#CC0000',
+      render: function(host){
+        if (cupKnockout) { renderKOList(host, DATA.cupKO, '#CC0000'); return; }
+        [['GROUP A', DATA.cup.a], ['GROUP B', DATA.cup.b]].forEach(function(g){
+          var lab = el('div', null, g[0]);
+          lab.style.cssText = 'font-size:9px;font-weight:800;letter-spacing:1px;color:#8a939c;margin:6px 0 3px';
+          host.appendChild(lab);
+          g[1].slice(0,3).forEach(function(r,i){
+            var row = el('div','sp-row');
+            var bar = el('span'); bar.style.cssText = 'width:2px;height:15px;background:' + (i===0?'#CC0000':'#f0a6a6');
+            row.appendChild(bar);
+            row.appendChild(el('span','p', String(i+1)));
+            row.appendChild(el('span','n', r.name));
+            row.appendChild(el('span','v', String(r.pts)));
+            host.appendChild(row);
+          });
+        });
+      }
+    });
   }
 
   panels.push({ title:'SUPERCOPA', colour:'#C9A227', render:function(host){
