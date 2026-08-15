@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FFS Draft 25/26</title>
+<title>FFS Draft 26/27</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap">
 <style>
@@ -359,7 +359,7 @@ img{display:block;max-width:100%}
     <div class="brand">
       <div class="brand-mark"><i></i><i></i><i></i></div>
       <div class="brand-name">FFS</div>
-      <div class="brand-sub">Draft 25/26</div>
+      <div class="brand-sub">Draft 26/27</div>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="side-panel">
@@ -387,33 +387,35 @@ img{display:block;max-width:100%}
    CONFIG  - everything season-specific lives here
    ===================================================================== */
 var CONFIG = {
-  season: '25/26',
-  sheetBase: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqA8oXKD2wrDWxxypqyV2LxnAEdgGZVqf5Ih2_RPybmlBiQPuczBWrg5-M4EPssoYLioBt79ySEjZL/pub?single=true&output=csv&gid=',
+  season: '26/27',
+  sheetBase: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzpbuaeYd1DzKkJszapnpA-iCmm_YPQmHuNxfYMhdMUGOjDtwuUsQFlqHEDpuQmpbr7aufi1UjhvQJ/pub?single=true&output=csv&gid=',
   refreshMs: 60000,
   leagues: [
     {
       key: 'L1',
-      name: 'League One',
+      name: 'FFS League',
+      /* Premier League masthead - purple through to cyan */
       accent: ['#8B2FD9','#7E36DD','#7040E4','#5F4DEB','#4C60F1','#3878F5','#2492F8','#12ADFB','#06C3FD','#00D4FF'],
       subBar: '#2A1160',
       subLine: '#00D4FF',
       gids: {
-        query1:      '0',
-        leagueTable: '30663119',
-        gwScores:    '1469042968',
-        h2h:         '800583406',
-        h2hKO:       '502965535',
-        h2hForm:     '379347250',
-        cupGroups:   '579700582',
-        cupKO:       '1027861412',
-        transfers:   '474568309',
-        playerData:  '399891851',
-        rules:       '1914416468'
-      },
-      teams: {
-        'Ben L':'2131430857','Adam S':'1622007174','Danny C':'976583926','Habeel K':'724825281',
-        'Josh R':'1371701033','Jamie S':'1248493649','Hugo H':'1550672397','Chris W':'610927521',
-        'Max W':'670115446','Pietro P':'1347514932'
+        leagueTable: '1230286349',
+        gwScores:    '2094136069',
+        transfers:   '958752103'
+      }
+    },
+    {
+      key: 'L2',
+      name: 'Audit League',
+      /* sibling of L1 - starts at the mid blue of that ramp rather
+         than the pale sky, then runs through violet into pink        */
+      accent: ['#1B3BD6','#3A3FDE','#5643E2','#7047E2','#8A4BDE','#A34FD6','#BB53C9','#D157B8','#E45BA6','#FF4FA0'],
+      subBar: '#40103A',
+      subLine: '#FF4FA0',
+      gids: {
+        leagueTable: '1420897925',
+        gwScores:    '930057571',
+        transfers:   '958752103'
       }
     }
   ],
@@ -431,9 +433,9 @@ var CONFIG = {
   },
   comps: [
     { key:'league', name:'Overall league', colour:'#0091DA', meta:'GW1-38 - total points' },
-    { key:'h2h',    name:'Head to Head',   colour:'#003399', meta:'GW1-36 - final GW38' },
+    { key:'h2h',    name:'Head to Head',   colour:'#003399', meta:'GW1-34 - final GW38' },
     { key:'cup',    name:'FFS Cup',        colour:'#CC0000', meta:'GW21-30 - final GW38' },
-    { key:'super',  name:'Supercopa',      colour:'#C9A227', meta:'New for 2026/27' }
+    { key:'super',  name:'Supercopa',      colour:'#C9A227', meta:'Apertura and Clausura' }
   ],
   img: {
     hero:      'img/hero/home.jpg',
@@ -501,6 +503,12 @@ function parseCSV(text){
 function sheetUrl(league, key){ return CONFIG.sheetBase + league.gids[key]; }
 
 function fetchSheet(league, key){
+  /* A sheet whose tab id is not set yet simply does not exist. Reject
+     rather than fetching a malformed URL, so the caller's catch turns
+     it into null and the page shows its own empty state.            */
+  if (!league || !league.gids || !league.gids[key]) {
+    return Promise.reject(new Error('no tab id for ' + key));
+  }
   var url = sheetUrl(league, key);
   if (cache[url]) return Promise.resolve(cache[url]);
   return fetch(url)
@@ -525,23 +533,49 @@ function parseLeagueTable(rows){
     });
 }
 
-/* Gameweek Scores: row0 = ['GW', name, name...]; rows 'GW1'.. */
+/* Gameweek Scores.
+
+   The 25/26 workbook had managers across the top and gameweeks down
+   the side. The new one is the other way round - one row per manager,
+   38 columns - which is far easier to read and is what every
+   competition consumes. So this reads the new shape:
+
+     row 0  : Manager | GW1 | GW2 | ... | GW38
+     row 1+ : Ben L   |  50 |  30 | ...
+
+   A gameweek counts as played if any manager has a value in it. A
+   genuine zero counts; a blank does not.                             */
 function parseGwScores(rows){
   if (!rows || rows.length < 2) return { names: [], byName: {}, played: 0 };
-  var names = rows[0].slice(1).map(function(s){ return String(s).trim(); }).filter(Boolean);
-  var byName = {};
-  names.forEach(function(nm){ byName[nm] = []; });
-  var played = 0;
-  rows.slice(1).forEach(function(r){
-    if (!r[0] || String(r[0]).indexOf('GW') !== 0) return;
-    var any = false;
-    names.forEach(function(nm, i){
-      var v = num(r[i+1]);
-      byName[nm].push(v);
-      if (v > 0) any = true;
-    });
-    if (any) played++;
+
+  var head = rows[0] || [];
+  var cols = [];
+  head.forEach(function(v, i){
+    if (i === 0) return;
+    var t = String(v || '').trim().toUpperCase();
+    if (t.indexOf('GW') === 0) cols.push(i);
   });
+  if (!cols.length) return { names: [], byName: {}, played: 0 };
+
+  var names = [], byName = {}, anyIn = {};
+
+  rows.slice(1).forEach(function(r){
+    var nm = r[0] ? String(r[0]).trim() : '';
+    if (!nm) return;
+    names.push(nm);
+    var series = [];
+    cols.forEach(function(c, k){
+      var raw = r[c];
+      var has = !(raw === undefined || raw === null || String(raw).trim() === '');
+      if (has) anyIn[k] = true;
+      series.push(has ? num(raw) : 0);
+    });
+    byName[nm] = series;
+  });
+
+  var played = 0;
+  for (var k = 0; k < cols.length; k++) if (anyIn[k]) played = k + 1;
+
   return { names: names, byName: byName, played: played };
 }
 
@@ -592,6 +626,7 @@ function parseTransfers(rows){
   var iId = ix('ID'), iWeb = ix('Web Name'), iFirst = ix('First Name'), iSec = ix('Second Name');
   var iPos = ix('Position'), iClub = ix('Club'), iPts = ix('Total Points');
   var iG = ix('Goals'), iA = ix('Assists'), iCs = ix('Clean Sheets'), iTeam = ix('Team Owned');
+  var iCode = ix('Code'), iBonus = ix('Bonus');
   var iFee = -1;
   h.forEach(function(v, k){ if (String(v).indexOf('Fee') === 0) iFee = k; });
   return rows.slice(1).filter(function(r){ return r[iId]; }).map(function(r){
@@ -599,6 +634,8 @@ function parseTransfers(rows){
       id: String(r[iId]), web: r[iWeb] || '', first: r[iFirst] || '', sec: r[iSec] || '',
       pos: r[iPos] || '', club: r[iClub] || '', pts: num(r[iPts]),
       goals: num(r[iG]), assists: num(r[iA]), cs: num(r[iCs]),
+      code: iCode >= 0 ? (r[iCode] || '') : '',
+      bonus: iBonus >= 0 ? num(r[iBonus]) : 0,
       team: iTeam >= 0 ? (r[iTeam] || '') : '', fee: iFee >= 0 ? num(r[iFee]) : 0
     };
   });
@@ -700,9 +737,25 @@ function parseH2HForm(rows){
    ===================================================================== */
 var LEAGUE = CONFIG.leagues[0];
 var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2hForm:null,
-             players:null, codes:null, bonus:null, squads:{} };
+             players:null, codes:null, bonus:null, squads:{}, byLeague:{} };
 var loaded = { home:false, league:false, h2h:false, cup:false, squads:false, players:false, portal:false };
 var route = 'home';
+
+function leagueByKey(key){
+  var out = CONFIG.leagues[0];
+  CONFIG.leagues.forEach(function(l){ if (l.key === key) out = l; });
+  return out;
+}
+
+/* Point the shared DATA.table / DATA.gw at one league. Everything that
+   already existed reads those two, so switching league is a matter of
+   repointing them rather than reworking every render function.      */
+function useLeague(key){
+  LEAGUE = leagueByKey(key);
+  var d = DATA.byLeague[key] || {};
+  DATA.table = d.table || null;
+  DATA.gw = d.gw || null;
+}
 
 /* =====================================================================
    NAV
@@ -762,26 +815,69 @@ document.getElementById('nav').addEventListener('click', function(e){
    BOOT - load core sheets then render
    ===================================================================== */
 function boot(){
-  Promise.all([
-    fetchSheet(LEAGUE,'leagueTable').then(parseLeagueTable).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'gwScores').then(parseGwScores).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'h2h').then(parseH2H).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'cupGroups').then(parseCupGroups).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'h2hKO').then(parseKO).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'cupKO').then(parseKO).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'h2hForm').then(parseH2HForm).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'transfers').then(parseTransfers).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'query1').then(parsePhotoCodes).catch(function(){ return null; }),
-    fetchSheet(LEAGUE,'playerData').then(parseBonus).catch(function(){ return null; })
-  ]).then(function(res){
-    DATA.table = res[0]; DATA.gw = res[1]; DATA.h2h = res[2];
-    DATA.cup = res[3]; DATA.h2hKO = res[4]; DATA.cupKO = res[5]; DATA.h2hForm = res[6];
-    DATA.players = res[7]; DATA.codes = res[8]; DATA.bonus = res[9];
-    if (DATA.players && DATA.bonus) DATA.players.forEach(function(p){ p.bonus = DATA.bonus[p.id] || 0; });
+  /* Every competition sheet beyond the league tables is still to be
+     built. fetchSheet rejects for a gid that is not set, the catch
+     turns that into null, and each page already handles null by
+     showing its own "not yet available" state. So this loads what
+     exists today and grows as sheets appear.                        */
+  var jobs = [];
+
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(
+      fetchSheet(lg,'leagueTable').then(parseLeagueTable).catch(function(){ return null; })
+        .then(function(t){
+          if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+          DATA.byLeague[lg.key].table = t;
+        })
+    );
+    jobs.push(
+      fetchSheet(lg,'gwScores').then(parseGwScores).catch(function(){ return null; })
+        .then(function(g){
+          if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+          DATA.byLeague[lg.key].gw = g;
+        })
+    );
+  });
+
+  var L1 = CONFIG.leagues[0];
+  jobs.push(fetchSheet(L1,'transfers').then(parseTransfers).catch(function(){ return null; })
+    .then(function(p){ DATA.players = p; }));
+  jobs.push(fetchSheet(L1,'h2h').then(parseH2H).catch(function(){ return null; })
+    .then(function(x){ DATA.h2h = x; }));
+  jobs.push(fetchSheet(L1,'cupGroups').then(parseCupGroups).catch(function(){ return null; })
+    .then(function(x){ DATA.cup = x; }));
+  jobs.push(fetchSheet(L1,'h2hKO').then(parseKO).catch(function(){ return null; })
+    .then(function(x){ DATA.h2hKO = x; }));
+  jobs.push(fetchSheet(L1,'cupKO').then(parseKO).catch(function(){ return null; })
+    .then(function(x){ DATA.cupKO = x; }));
+  jobs.push(fetchSheet(L1,'h2hForm').then(parseH2HForm).catch(function(){ return null; })
+    .then(function(x){ DATA.h2hForm = x; }));
+
+  Promise.all(jobs).then(function(){
+    /* the Transfer Player List carries bonus and the player code, so
+       photos and bonus points come from the one sheet now           */
+    DATA.codes = codesFromTransfers(DATA.players);
+    if (DATA.players) DATA.players.forEach(function(p){ p.bonus = p.bonus || 0; });
+
+    useLeague(CONFIG.leagues[0].key);
     buildNav();
     renderHome();
     buildSidePanels();
   });
+}
+
+/* player id -> FPL photo code, taken from the Transfer Player List.
+   The 25/26 workbook had a separate Query1 tab for this; the new
+   Transfer Player List carries a Code column, so one fewer sheet.  */
+function codesFromTransfers(players){
+  var byId = {}, byName = {};
+  (players || []).forEach(function(p){
+    if (!p.code) return;
+    byId[String(p.id)] = String(p.code);
+    if (p.web) byName[String(p.web).toLowerCase().trim()] = String(p.code);
+    if (p.sec) byName[String(p.sec).toLowerCase().trim()] = String(p.code);
+  });
+  return { byId: byId, byName: byName };
 }
 
 /* =====================================================================
@@ -1078,16 +1174,48 @@ function drawPanel(){
    ===================================================================== */
 var scrubGw = 38, pinned = null, playTimer = null;
 
+/* One button per league, coloured with that league's own masthead
+   ramp so the switch itself tells you where you are. Only shown when
+   there is more than one league to switch between.                  */
+function buildLeagueSwitch(host){
+  if (CONFIG.leagues.length < 2) return;
+
+  var bar = el('div');
+  bar.style.cssText = 'display:flex;gap:6px;padding:12px 24px 0';
+
+  CONFIG.leagues.forEach(function(lg){
+    var on = lg.key === LEAGUE.key;
+    var b = document.createElement('button');
+    b.textContent = lg.name;
+    b.style.cssText = 'font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.6px;'
+      + 'padding:7px 14px;cursor:pointer;border:1px solid '
+      + (on ? lg.accent[0] : '#dbe2e9') + ';'
+      + 'background:' + (on ? lg.accent[0] : '#fff') + ';'
+      + 'color:' + (on ? '#fff' : '#5a6570');
+    b.addEventListener('click', function(){
+      if (lg.key === LEAGUE.key) return;
+      if (playTimer) { clearInterval(playTimer); playTimer = null; }
+      pinned = null;
+      useLeague(lg.key);
+      renderLeague();
+    });
+    bar.appendChild(b);
+  });
+
+  host.appendChild(bar);
+}
+
 function renderLeague(){
   var host = document.getElementById('p-league');
-  if (loaded.league) return;
+  clear(host);
+
   if (!DATA.table || !DATA.gw){
-    clear(host);
-    host.appendChild(el('div','err','Could not load the league table or gameweek scores sheet.'));
+    host.appendChild(el('div','err',
+      'Could not load ' + LEAGUE.name + '. Check the sheet is still published to the web.'));
+    buildLeagueSwitch(host);
     return;
   }
   loaded.league = true;
-  clear(host);
 
   /* masthead */
   var mast = el('div','lt-mast');
@@ -1113,7 +1241,7 @@ function renderLeague(){
   copy.appendChild(slot);
   var inner = el('div');
   var h1 = el('h1', null, 'Table');
-  var p = el('p', null, 'FFS DRAFT - ' + LEAGUE.name.toUpperCase());
+  var p = el('p', null, 'FFS DRAFT \u00B7 ' + LEAGUE.name.toUpperCase());
   inner.appendChild(h1); inner.appendChild(p);
   copy.appendChild(inner);
   mast.appendChild(copy);
@@ -1125,6 +1253,8 @@ function renderLeague(){
   sspan.style.borderBottomColor = LEAGUE.subLine;
   sub.appendChild(sspan);
   host.appendChild(sub);
+
+  buildLeagueSwitch(host);
 
   /* scrubber */
   var maxGw = Math.max(1, DATA.gw.played);
@@ -1157,8 +1287,8 @@ function renderLeague(){
   host.appendChild(card);
 
   var note = el('div','note');
-  note.textContent = 'Stage one build. Gameweek scrubbing is calculated live from the Gameweek Scores sheet. '
-    + 'Manager photos will appear once images are added to img/managers.';
+  note.textContent = 'The slider rewinds the table to any gameweek. Manager photos appear '
+    + 'once images are added to img/managers.';
   host.appendChild(note);
 
   function paint(gw){
@@ -2021,215 +2151,17 @@ function renderSquads(){
   loaded.squads = true;
   clear(host);
 
-  var names = Object.keys(LEAGUE.teams);
-  var pick = el('div','sq-pick');
-  names.forEach(function(nm){
-    var b = document.createElement('button');
-    b.textContent = nm; b.setAttribute('data-t', nm);
-    pick.appendChild(b);
-  });
-  host.appendChild(pick);
-  var body = el('div');
-  host.appendChild(body);
-
-  pick.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-t]');
-    if (!b) return;
-    sqTeam = b.getAttribute('data-t');
-    pick.querySelectorAll('button').forEach(function(x){
-      x.classList.remove('on'); x.style.background=''; x.style.borderColor='';
-    });
-    var kit = CONFIG.managers[sqTeam];
-    b.classList.add('on');
-    b.style.background = kit ? kit.body : '#0091DA';
-    b.style.borderColor = kit ? kit.body : '#0091DA';
-    b.style.color = kit ? kit.type : '#fff';
-    drawSquad(body, sqTeam);
-  });
-
-  pick.querySelector('button').click();
-}
-
-function drawSquad(host, name){
-  clear(host);
-  host.appendChild(el('div','load','Loading ' + name));
-  var gid = LEAGUE.teams[name];
-  var url = CONFIG.sheetBase + gid;
-
-  var done = function(rows){
-    clear(host);
-    var kit = CONFIG.managers[name] || { body:'#0091DA', accent:'#0C2340', type:'#fff' };
-    var h = rows[0] || [];
-    var iPos = h.indexOf('Position'), iPl = h.indexOf('Player'), iCl = h.indexOf('Club');
-    var iFee = h.indexOf('Transfer Fee'), iTot = h.indexOf('Total');
-    var gwCols = [];
-    h.forEach(function(v,k){ if (v && String(v).indexOf('GW') === 0) gwCols.push({ label:String(v), i:k }); });
-
-    var players = rows.slice(1).filter(function(r){ return r[iPl] && r[iPl] !== 'TEAM TOTAL'; });
-    var totalRow = rows.slice(1).filter(function(r){ return r[iPl] === 'TEAM TOTAL'; })[0];
-
-    /* header */
-    var head = el('div','sq-head');
-    var L = el('div','l'); L.style.background = kit.body; L.style.color = kit.type;
-    var av = el('div','av');
-    var aim = document.createElement('img');
-    aim.alt=''; aim.src = CONFIG.img.manager(name);
-    aim.addEventListener('error', function(){ if(aim.parentNode) aim.parentNode.removeChild(aim); av.textContent = name.substring(0,2); });
-    av.appendChild(aim);
-    L.appendChild(av);
-    var lm = el('div');
-    var posInLeague = null;
-    if (DATA.table) DATA.table.forEach(function(t,i){ if (t.name === name) posInLeague = i+1; });
-    lm.appendChild(el('div','kick', posInLeague ? ordinal(posInLeague).toUpperCase() + ' - OVERALL LEAGUE' : 'FFS DRAFT'));
-    lm.appendChild(el('div','nm', name));
-    L.appendChild(lm);
-    head.appendChild(L);
-
-    var R = el('div','r'); R.style.background = kit.accent;
-    R.appendChild(el('div','t','COMPETITIONS'));
-    var comp = el('div','sq-comp');
-    var h2hPos = null;
-    if (DATA.h2h) DATA.h2h.table.forEach(function(t,i){ if (t.name === name) h2hPos = i+1; });
-    var cupPos = '-';
-    if (DATA.cup){
-      DATA.cup.a.forEach(function(t,i){ if (t.name === name) cupPos = 'A' + (i+1); });
-      DATA.cup.b.forEach(function(t,i){ if (t.name === name) cupPos = 'B' + (i+1); });
-    }
-    [['Overall league', posInLeague ? ordinal(posInLeague) : '-'],
-     ['Head to Head', h2hPos ? ordinal(h2hPos) : '-'],
-     ['FFS Cup', cupPos],
-     ['Supercopa', '-']].forEach(function(c){
-      var d = el('div');
-      d.appendChild(el('span', null, c[0]));
-      d.appendChild(el('b', null, c[1]));
-      comp.appendChild(d);
-    });
-    R.appendChild(comp);
-    head.appendChild(R);
-    host.appendChild(head);
-
-    var trim = el('div','sq-trim');
-    var t1 = el('span'); t1.style.cssText = 'flex:1;background:' + kit.accent;
-    var t2 = el('span'); t2.style.cssText = 'width:206px;background:' + kit.body;
-    trim.appendChild(t1); trim.appendChild(t2);
-    host.appendChild(trim);
-
-    /* tiles */
-    var total = totalRow && iTot >= 0 ? num(totalRow[iTot]) : 0;
-    var gwTotals = gwCols.map(function(g){ return totalRow ? num(totalRow[g.i]) : 0; }).filter(function(v){ return v > 0; });
-    var best = gwTotals.length ? Math.max.apply(null, gwTotals) : 0;
-    var worst = gwTotals.length ? Math.min.apply(null, gwTotals) : 0;
-    var ave = gwTotals.length ? (gwTotals.reduce(function(a,b){return a+b;},0)/gwTotals.length) : 0;
-    var spend = 0;
-    players.forEach(function(r){ spend += num(String(r[iFee]).replace(/[^0-9.]/g,'')); });
-
-    var tiles = el('div','sq-tiles');
-    [[total,'POINTS'],[best,'BEST GW'],[worst,'WORST GW'],[ave.toFixed(1),'AVERAGE'],[players.length + '/15','SQUAD']]
-      .forEach(function(c, i){
-        var d = el('div');
-        d.style.background = i % 2 ? kit.accent : kit.body;
-        d.style.color = i % 2 ? '#fff' : kit.type;
-        d.appendChild(el('b', null, String(c[0])));
-        d.appendChild(el('span', null, c[1]));
-        tiles.appendChild(d);
-      });
-    host.appendChild(tiles);
-
-    /* table */
-    var order = { GK:1, DEF:2, MID:3, FWD:4 };
-    var limits = { GK:2, DEF:5, MID:5, FWD:3 };
-    players.sort(function(a,b){
-      var d = (order[a[iPos]]||5) - (order[b[iPos]]||5);
-      if (d) return d;
-      return (iTot>=0 ? num(b[iTot]) - num(a[iTot]) : 0);
-    });
-    var tots = players.map(function(r,i){ return { i:i, v: iTot>=0 ? num(r[iTot]) : 0 }; })
-                      .sort(function(a,b){ return b.v - a.v; });
-    var medals = {};
-    if (tots[0]) medals[tots[0].i] = 'var(--gold)';
-    if (tots[1]) medals[tots[1].i] = 'var(--silver)';
-    if (tots[2]) medals[tots[2].i] = 'var(--bronze)';
-
-    var wrapT = el('div','sq-tbl');
-    var tbl = document.createElement('table');
-    var thead = document.createElement('thead');
-    var hr = document.createElement('tr');
-    ['','POS','PLAYER','CLUB','FEE'].forEach(function(c, i){
-      var th = document.createElement('th');
-      th.textContent = c; if (i < 4) th.className = 'l';
-      hr.appendChild(th);
-    });
-    gwCols.forEach(function(g){
-      var th = document.createElement('th'); th.textContent = g.label.replace('GW',''); hr.appendChild(th);
-    });
-    var thT = document.createElement('th'); thT.textContent = 'TOTAL'; hr.appendChild(thT);
-    var thM = document.createElement('th'); thM.textContent = ''; hr.appendChild(thM);
-    thead.appendChild(hr); tbl.appendChild(thead);
-
-    var tb = document.createElement('tbody');
-    var lastPos = null;
-    players.forEach(function(r, i){
-      var pos = r[iPos] || '';
-      if (pos !== lastPos){
-        lastPos = pos;
-        var gr = document.createElement('tr'); gr.className = 'sq-grp';
-        var gd = document.createElement('td');
-        gd.className = 'l'; gd.colSpan = 5 + gwCols.length + 2;
-        gd.style.color = kit.accent === '#FFFFFF' ? kit.body : kit.accent;
-        var cnt = players.filter(function(x){ return x[iPos] === pos; }).length;
-        gd.textContent = pos + '  ' + cnt + '/' + (limits[pos] || cnt);
-        gr.appendChild(gd); tb.appendChild(gr);
-      }
-      var tr = document.createElement('tr');
-      var tdA = document.createElement('td'); tdA.className='l';
-      tdA.appendChild(playerPhoto(null, r[iPl], 22)); tr.appendChild(tdA);
-      var tdP = document.createElement('td'); tdP.className='l';
-      var pill = el('span','pp', pos);
-      pill.style.background = '#f2f4f7'; pill.style.color = 'var(--ink2)';
-      tdP.appendChild(pill); tr.appendChild(tdP);
-      var tdN = document.createElement('td'); tdN.className='l';
-      tdN.style.fontWeight='600'; tdN.textContent = r[iPl] || ''; tr.appendChild(tdN);
-      var tdC = document.createElement('td'); tdC.className='l';
-      tdC.style.color='var(--ink3)'; tdC.textContent = r[iCl] || ''; tr.appendChild(tdC);
-      var tdF = document.createElement('td'); tdF.className='l';
-      tdF.style.color='var(--ink3)'; tdF.textContent = r[iFee] || '-'; tr.appendChild(tdF);
-      gwCols.forEach(function(g){
-        var v = num(r[g.i]);
-        var td = document.createElement('td');
-        td.textContent = v > 0 ? String(v) : '';
-        td.style.textAlign = 'center';
-        if (v >= 10){ td.style.background = 'rgba(212,175,55,.25)'; td.style.color = '#78350f'; td.style.fontWeight='800'; }
-        else if (v >= 5){ td.style.background = 'rgba(76,156,44,.14)'; td.style.color = '#2d5c12'; td.style.fontWeight='700'; }
-        else td.style.color = 'var(--ink3)';
-        tr.appendChild(td);
-      });
-      var tdT = document.createElement('td');
-      tdT.style.fontWeight='800'; tdT.style.fontSize='13px';
-      tdT.textContent = iTot >= 0 ? String(num(r[iTot])) : '';
-      tr.appendChild(tdT);
-      var tdM = document.createElement('td');
-      var mk = el('span','medal');
-      mk.style.background = medals[i] || 'transparent';
-      tdM.appendChild(mk); tr.appendChild(tdM);
-      tb.appendChild(tr);
-    });
-    tbl.appendChild(tb);
-    wrapT.appendChild(tbl);
-    host.appendChild(wrapT);
-
-    var note = el('div','note');
-    note.textContent = 'Started-in-XI percentage and points contributed to the team need new columns from the Apps Script, '
-      + 'so they are not shown yet.';
-    host.appendChild(note);
-  };
-
-  if (cache[url]) { done(cache[url]); return; }
-  fetch(url).then(function(r){ return r.text(); }).then(function(t){
-    var rows = parseCSV(t); cache[url] = rows; done(rows);
-  }).catch(function(){
-    clear(host);
-    host.appendChild(el('div','err','Could not load the squad sheet for ' + name + '.'));
-  });
+  /* The 25/26 workbook wrote one published tab per manager and this
+     page read those. The new script does not - squads come from the
+     picks and the register instead, which also makes points
+     contributed and XI% possible for the first time. So this page is
+     being rebuilt rather than repointed.                            */
+  var box = el('div','note');
+  box.style.margin = '28px 24px';
+  box.textContent = 'The Squads page is being rebuilt against the new data. It will show each '
+    + 'manager\u2019s fifteen, what they cost, points contributed and how often each player '
+    + 'made the eleven \u2014 none of which the old version could do.';
+  host.appendChild(box);
 }
 
 /* =====================================================================
