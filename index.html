@@ -49,6 +49,21 @@ img{display:block;max-width:100%}
 .main{flex:1;min-width:0}
 .page{display:none}
 .page.on{display:block}
+/* league bar - which strand you are looking at, on every page that
+   has two of them. It is sticky because the answer has to be visible
+   at the bottom of a long table as much as the top. */
+.lgbar{position:sticky;top:0;z-index:30;display:none;align-items:center;gap:10px;
+       padding:10px 24px;background:#fff;border-bottom:1px solid #e3e8ee}
+.lgbar.on{display:flex}
+.lgbar .lbl{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+            color:#8a939c;margin-right:2px}
+.lgbar button{font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+              padding:7px 16px;border-radius:3px;border:1px solid #dbe2e9;
+              background:#fff;color:#5a6570;transition:none}
+.lgbar button.on{color:#fff;border-color:transparent}
+.lgbar .count{margin-left:auto;font-size:11px;color:#8a939c}
+@media(max-width:700px){ .lgbar{padding:9px 16px} .lgbar button{padding:6px 12px;font-size:12px} }
+
 .load{padding:70px 20px;text-align:center;color:var(--ink3);font-size:13px}
 .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--rsm-azure);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 12px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -371,6 +386,7 @@ img{display:block;max-width:100%}
   </aside>
 
   <main class="main">
+    <div class="lgbar" id="lgbar"></div>
     <section class="page on" id="p-home"><div class="load"><div class="spin"></div>Loading season data</div></section>
     <section class="page" id="p-league"><div class="load"><div class="spin"></div>Loading league table</div></section>
     <section class="page" id="p-h2h"><div class="load"><div class="spin"></div>Loading head to head</div></section>
@@ -394,6 +410,8 @@ var CONFIG = {
     {
       key: 'L1',
       name: 'FFS League',
+      cupName: 'FFS Cup',
+      h2hName: 'FFS Head to Head',
       /* Premier League masthead - purple through to cyan */
       accent: ['#8B2FD9','#7E36DD','#7040E4','#5F4DEB','#4C60F1','#3878F5','#2492F8','#12ADFB','#06C3FD','#00D4FF'],
       subBar: '#2A1160',
@@ -413,6 +431,8 @@ var CONFIG = {
     {
       key: 'L2',
       name: 'Audit League',
+      cupName: 'Audit Cup',
+      h2hName: 'Audit Head to Head',
       /* sibling of L1 - starts at the mid blue of that ramp rather
          than the pale sky, then runs through violet into pink        */
       accent: ['#1B3BD6','#3A3FDE','#5643E2','#7047E2','#8A4BDE','#A34FD6','#BB53C9','#D157B8','#E45BA6','#FF4FA0'],
@@ -952,7 +972,11 @@ function useLeague(key){
 
   sqTeam = null;
 
-  if (typeof route !== 'undefined' && bootDone) redrawCurrent();
+  if (typeof route !== 'undefined' && bootDone) {
+    buildNav();
+    buildLeagueBar();
+    redrawCurrent();
+  }
 }
 
 var bootDone = false;
@@ -973,7 +997,7 @@ var NAV = [
   { key:'home',   label:'Home' },
   { key:'league', label:'League Table' },
   { key:'h2h',    label:'Head to Head' },
-  { key:'cup',    label:'FFS Cup' },
+  { key:'cup',    label:'Cup' },
   { key:'super',  label:'Supercopa',    stub:true },
   { key:'squads', label:'Squads' },
   { key:'players',label:'Players' },
@@ -996,6 +1020,7 @@ function go(key){
   buildNav();
   var known = ['home','league','h2h','cup','squads','players','portal'].indexOf(key) >= 0;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('on'); });
+  buildLeagueBar();
   if (key === 'home')       { document.getElementById('p-home').classList.add('on'); renderHome(); }
   else if (key === 'league'){ document.getElementById('p-league').classList.add('on'); renderLeague(); }
   else if (key === 'h2h')   { document.getElementById('p-h2h').classList.add('on'); renderH2H(); }
@@ -1126,6 +1151,7 @@ function boot(){
     useLeague(CONFIG.leagues[0].key);
     bootDone = true;
     buildNav();
+    buildLeagueBar();
     renderHome();
     buildSidePanels();
   });
@@ -1382,7 +1408,7 @@ function buildSidePanels(){
   if (DATA.cup && (DATA.cup.a.length || DATA.cup.b.length)){
     var cupKnockout = koActive(DATA.cupKO);
     panels.push({
-      title: cupKnockout ? 'FFS CUP - KO' : 'FFS CUP',
+      title: (LEAGUE.cupName || 'CUP').toUpperCase() + (cupKnockout ? ' - KO' : ''),
       colour: '#CC0000',
       render: function(host){
         if (cupKnockout) { renderKOList(host, DATA.cupKO, '#CC0000'); return; }
@@ -1451,6 +1477,48 @@ var scrubGw = 38, pinned = null, playTimer = null;
 /* One button per league, coloured with that league's own masthead
    ramp so the switch itself tells you where you are. Only shown when
    there is more than one league to switch between.                  */
+/* Which pages are one league at a time, and which cover all 22.
+
+   Getting this wrong is what made every page look like the Audit
+   League: the switcher lived inside the League Table page, so once
+   you had changed league there was nothing anywhere else telling you
+   which strand you were looking at, or letting you change back.     */
+var LEAGUE_PAGES = { home:true, league:true, h2h:true, cup:true, squads:true };
+var BOTH_LEAGUES = { super:true, honours:true, players:true, portal:true };
+
+function buildLeagueBar(){
+  var bar = document.getElementById('lgbar');
+  if (!bar) return;
+
+  if (!LEAGUE_PAGES[route]) { bar.className = 'lgbar'; clear(bar); return; }
+
+  bar.className = 'lgbar on';
+  clear(bar);
+
+  bar.appendChild(el('span','lbl','Showing'));
+
+  CONFIG.leagues.forEach(function(lg){
+    var on = lg.key === LEAGUE.key;
+    var b = el('button', on ? 'on' : '', lg.name);
+    if (on) b.style.background = lg.accent[0];
+    b.addEventListener('click', function(){
+      if (lg.key === LEAGUE.key) return;
+      useLeague(lg.key);
+      buildLeagueBar();
+    });
+    bar.appendChild(b);
+  });
+
+  var n = (DATA.table && DATA.table.length) || 0;
+  if (n) {
+    var c = el('span','count', n + ' managers');
+    bar.appendChild(c);
+  }
+}
+
+/* Superseded by buildLeagueBar. Kept because the H2H and Cup pages
+   may still want an inline switcher of their own later; nothing calls
+   it today.                                                          */
 function buildLeagueSwitch(host){
   if (CONFIG.leagues.length < 2) return;
 
@@ -1485,7 +1553,6 @@ function renderLeague(){
   if (!DATA.table || !DATA.table.length || !DATA.gw){
     host.appendChild(el('div','err',
       'Could not load ' + LEAGUE.name + '. Check the sheet is still published to the web.'));
-    buildLeagueSwitch(host);
     return;
   }
   loaded.league = true;
@@ -1527,7 +1594,9 @@ function renderLeague(){
   sub.appendChild(sspan);
   host.appendChild(sub);
 
-  buildLeagueSwitch(host);
+  /* the league switcher used to live here. It is now a sticky bar
+     above every page, because living on one page was exactly the
+     problem - change league here and nothing else told you. */
 
   /* scrubber */
   var maxGw = Math.max(1, DATA.gw.played);
@@ -1767,7 +1836,8 @@ function renderH2H(){
   mast.appendChild(slot);
   var mid = el('div');
   mid.appendChild(el('h2', null, 'HEAD TO HEAD'));
-  mid.appendChild(el('p', null, 'FFS DRAFT ' + CONFIG.season + ' - GW1-36'));
+  mid.appendChild(el('p', null,
+    (LEAGUE.h2hName || 'Head to Head').toUpperCase() + ' ' + CONFIG.season));
   mast.appendChild(mid);
   var champ = winnerOf(DATA.h2hKO, DATA.h2h.table);
   if (champ.name){
@@ -2219,7 +2289,8 @@ function renderCup(){
   slot.appendChild(im);
   mast.appendChild(slot);
   var mid = el('div');
-  mid.appendChild(el('h2', null, 'FFS CUP ' + CONFIG.season.replace('/','-')));
+  mid.appendChild(el('h2', null,
+    (LEAGUE.cupName || 'Cup').toUpperCase() + ' ' + CONFIG.season.replace('/','-')));
   mid.appendChild(el('p', null, 'GROUP STAGE'));
   mast.appendChild(mid);
   wrap.appendChild(mast);
