@@ -401,7 +401,13 @@ var CONFIG = {
       gids: {
         leagueTable: '1230286349',
         gwScores:    '2094136069',
-        transfers:   '958752103'
+        transfers:   '958752103',
+        h2h:         '1116994876',
+        h2hKO:       '1880286294',
+        h2hForm:     '1151590441',
+        cupGroups:   '1150018018',
+        cupKO:       '815009313',
+        squads:      '489847660'
       }
     },
     {
@@ -415,21 +421,67 @@ var CONFIG = {
       gids: {
         leagueTable: '1420897925',
         gwScores:    '930057571',
-        transfers:   '958752103'
+        transfers:   '958752103',
+        h2h:         '1527157631',
+        h2hKO:       '1409483735',
+        h2hForm:     '1948723177',
+        cupGroups:   '1788230832',
+        cupKO:       '178194009',
+        squads:      '872955274'
       }
     }
   ],
+  /* Sheets that belong to no single league - the two competitions that
+     span both, the colours, and the history. Reached with SHARED as
+     the "league", which works because fetchSheet only ever looks at
+     .gids on whatever it is handed.                                  */
+  shared: {
+    gids: {
+      superliga:     '553946858',
+      superligaForm: '648190433',
+      apertura:      '276246642',
+      aperturaKO:    '298592937',
+      clausura:      '702981662',
+      clausuraKO:    '1368264710',
+      copa:          '1412121410',
+      kits:          '1044530859',
+      motm:          '1342492495',
+      register:      '1484690353',
+      champions:     '204411720',
+      historic:      '1572948097',
+      players2526:   '554186143',
+      gwPts2526:     '1785033753',
+      ledger:        '70428418'
+    }
+  },
+
+  /* Fallback colours only. The real ones are read from the USER Kits
+     sheet at boot, so a change there reaches the site on the next
+     refresh with nothing to redeploy. These are what the site falls
+     back to if that sheet cannot be read at all.                     */
   managers: {
-    'Ben L':    { body:'#6CABE0', accent:'#8B1E33', type:'#1C2C5B' },
-    'Adam S':   { body:'#FFD700', accent:'#003087', type:'#003087' },
-    'Danny C':  { body:'#D4AF37', accent:'#8A6A0C', type:'#2A2A2A' },
-    'Habeel K': { body:'#C8102E', accent:'#FFFFFF', type:'#FFFFFF' },
-    'Josh R':   { body:'#6B2D6B', accent:'#6CADDF', type:'#FFFFFF' },
-    'Jamie S':  { body:'#1D4ED8', accent:'#FFD700', type:'#FFFFFF' },
-    'Hugo H':   { body:'#003087', accent:'#FFD700', type:'#FFFFFF' },
-    'Chris W':  { body:'#003087', accent:'#FFD700', type:'#FFFFFF' },
-    'Max W':    { body:'#111111', accent:'#FFD700', type:'#FFFFFF' },
-    'Pietro P': { body:'#009246', accent:'#CE2B37', type:'#FFFFFF' }
+    'Ben L':     { main:'#6CABDD', second:'#8B1E33', text:'#1C2C5B', fourth:'#FFFFFF' },
+    'Chris W':   { main:'#F0DD12', second:'#22258E', text:'#22258E', fourth:'#FFFFFF' },
+    'Danny C':   { main:'#373A4B', second:'#22258E', text:'#93D9D9', fourth:'#FFFFFF' },
+    'Adam S':    { main:'#035064', second:'#21242D', text:'#D4A94E', fourth:'#FFFFFF' },
+    'Hugo H':    { main:'#FC7999', second:'#FDD2A5', text:'#1C2C5B', fourth:'#000000' },
+    'Max W':     { main:'#282829', second:'#273771', text:'#FED313', fourth:'#FFFFFF' },
+    'Josh R':    { main:'#72073E', second:'#A0E8F4', text:'#FFFFFF', fourth:'#000000' },
+    'Jamie S':   { main:'#C9A227', second:'#191613', text:'#000000', fourth:'#FFFFFF' },
+    'Habeel K':  { main:'#D11E2A', second:'#FDDE4E', text:'#FFFFFF', fourth:'#000000' },
+    'Pietro P':  { main:'#009146', second:'#CE2A35', text:'#FFFFFF', fourth:'#FFFFFF' },
+    'Vidur B':   { main:'#0955C0', second:'#269687', text:'#FF9851', fourth:'#FFFFFF' },
+    'Jacob K':   { main:'#062B7D', second:'#FBEF41', text:'#FFFFFF', fourth:'#000000' },
+    'Ollie S':   { main:'#DA291C', second:'#191613', text:'#FFFFFF', fourth:'#FFFFFF' },
+    'Harry G':   { main:'#053AC8', second:'#DA291C', text:'#FFFFFF', fourth:'#FFFFFF' },
+    'Rowan S':   { main:'#00949A', second:'#FFFFFF', text:'#FFFFFF', fourth:'#000000' },
+    'Jason S':   { main:'#20242B', second:'#C8102E', text:'#E9C47D', fourth:'#FFFFFF' },
+    'Rushy J':   { main:'#1D59A1', second:'#C8A24B', text:'#FFFFFF', fourth:'#000000' },
+    'Kellett J': { main:'#FEF642', second:'#1B347D', text:'#1B347D', fourth:'#FFFFFF' },
+    'Blake W':   { main:'#173152', second:'#191613', text:'#FFFF00', fourth:'#FFFFFF' },
+    'Tom W':     { main:'#6CABDD', second:'#1F1D1A', text:'#1C2C5B', fourth:'#F0C987' },
+    'JLS':       { main:'#AFA1C5', second:'#FFFFFF', text:'#383458', fourth:'#000000' },
+    'Paddy S':   { main:'#C1272D', second:'#181214', text:'#FFFFFF', fourth:'#FFFFFF' }
   },
   comps: [
     { key:'league', name:'Overall league', colour:'#0091DA', meta:'GW1-38 - total points' },
@@ -501,6 +553,10 @@ function parseCSV(text){
 }
 
 function sheetUrl(league, key){ return CONFIG.sheetBase + league.gids[key]; }
+
+/* Stands in for a league when the sheet belongs to neither - the two
+   competitions that span both, the colours, the history.            */
+var SHARED = CONFIG.shared;
 
 function fetchSheet(league, key){
   /* A sheet whose tab id is not set yet simply does not exist. Reject
@@ -702,6 +758,124 @@ function playerPhoto(id, nm, size){
 }
 
 /* KO sheets - generic: label, home, hs, as, away */
+/* USER Kits: 0 Manager | 1 League | 2 Main | 3 Second | 4 Text | 5 4th | 6 Kit
+
+   Main, Second and Text are the manager's identity - the shirt they
+   picked. The 4th is functional: it is what gets written on Second,
+   and it exists because white on a pale Second is unreadable, which
+   is what broke last season.
+
+   Anything unreadable falls back rather than coming through blank, so
+   nothing downstream has to guard against an empty colour.          */
+/* Squads L1 / L2. Two blocks:
+
+     SUMMARY  Manager | Name | Players | Spent | Remaining | Squad Points
+              | Points in XI | Best Player | Source
+     SQUADS   Manager | Player | Pos | Club | Fee | Starts | Points in XI
+              | Points Total | PPG in XI | Status
+
+   Read by finding the two markers rather than by counting rows, so an
+   extra blank line in the sheet cannot shift everything by one.     */
+function parseSquads(rows){
+  if (!rows || !rows.length) return null;
+
+  var mode = '', summary = [], players = [];
+
+  for (var i = 0; i < rows.length; i++){
+    var r = rows[i];
+    var first = String(r[0] || '').trim();
+
+    if (first === 'SUMMARY') { mode = 'S'; continue; }
+    if (first === 'SQUADS')  { mode = 'P'; continue; }
+    if (!first || first === 'Manager') continue;
+
+    if (mode === 'S'){
+      summary.push({
+        name:      first,
+        real:      String(r[1] || '').trim(),
+        count:     num(r[2]),
+        spent:     r[3] === '' ? null : num(r[3]),
+        remaining: r[4] === '' ? null : num(r[4]),
+        squadPts:  num(r[5]),
+        xiPts:     num(r[6]),
+        best:      String(r[7] || '').trim(),
+        source:    String(r[8] || '').trim()
+      });
+    } else if (mode === 'P'){
+      players.push({
+        manager:  first,
+        name:     String(r[1] || '').trim(),
+        pos:      String(r[2] || '').trim(),
+        club:     String(r[3] || '').trim(),
+        fee:      r[4] === '' ? null : num(r[4]),
+        starts:   num(r[5]),
+        xiPts:    num(r[6]),
+        totalPts: num(r[7]),
+        ppg:      num(r[8]),
+        status:   String(r[9] || '').trim()
+      });
+    }
+  }
+
+  if (!summary.length && !players.length) return null;
+
+  var byManager = {};
+  summary.forEach(function(m){ byManager[m.name] = { summary: m, players: [] }; });
+  players.forEach(function(p){
+    if (!byManager[p.manager]) byManager[p.manager] = { summary: null, players: [] };
+    byManager[p.manager].players.push(p);
+  });
+
+  return { summary: summary, players: players, byManager: byManager };
+}
+
+function parseKits(rows){
+  if (!rows || !rows.length) return null;
+  var out = {};
+  for (var i = 1; i < rows.length; i++){
+    var r = rows[i];
+    var name = String(r[0] || '').trim();
+    if (!name) continue;
+    out[name] = {
+      main:   hex(r[2]) || KIT_FALLBACK.main,
+      second: hex(r[3]) || KIT_FALLBACK.second,
+      text:   hex(r[4]) || KIT_FALLBACK.text,
+      fourth: hex(r[5]) || KIT_FALLBACK.fourth,
+      kit:    String(r[6] || '').trim()
+    };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+var KIT_FALLBACK = { main:'#3A3A3A', second:'#EFEFEF', text:'#FFFFFF', fourth:'#111111' };
+
+function hex(v){
+  var t = String(v == null ? '' : v).trim().replace(/^#/,'').toUpperCase();
+  if (/^[0-9A-F]{3}$/.test(t)) t = t[0]+t[0]+t[1]+t[1]+t[2]+t[2];
+  return /^[0-9A-F]{6}$/.test(t) ? '#' + t : '';
+}
+
+/* One manager's colours. The sheet wins; CONFIG.managers is only what
+   the site falls back to if the sheet cannot be read at all.
+
+   `body`, `accent` and `type` are the names the older pages use, and
+   are kept as aliases so nothing had to be rewritten to take the new
+   colours.                                                          */
+function kitFor(name){
+  var k = (DATA.kits && DATA.kits[name]) || CONFIG.managers[name] || KIT_FALLBACK;
+  return {
+    main:   k.main   || k.body   || KIT_FALLBACK.main,
+    second: k.second || k.accent || KIT_FALLBACK.second,
+    text:   k.text   || k.type   || KIT_FALLBACK.text,
+    fourth: k.fourth || KIT_FALLBACK.fourth,
+    kit:    k.kit || '',
+    /* aliases for the pages written before the kits sheet existed */
+    body:   k.main   || k.body   || KIT_FALLBACK.main,
+    accent: k.second || k.accent || KIT_FALLBACK.second,
+    type:   k.text   || k.type   || KIT_FALLBACK.text
+  };
+}
+
 function parseKO(rows){
   var out = [], champion = '';
   rows.forEach(function(r){
@@ -753,8 +927,43 @@ function leagueByKey(key){
 function useLeague(key){
   LEAGUE = leagueByKey(key);
   var d = DATA.byLeague[key] || {};
-  DATA.table = d.table || null;
-  DATA.gw = d.gw || null;
+
+  DATA.table   = d.table   || null;
+  DATA.gw      = d.gw      || null;
+  DATA.squads  = d.squads  || null;
+  DATA.h2h     = d.h2h     || null;
+  DATA.h2hKO   = d.h2hKO   || null;
+  DATA.h2hForm = d.h2hForm || null;
+  DATA.cup     = d.cup     || null;
+  DATA.cupKO   = d.cupKO   || null;
+
+  /* Every one of those pages is drawn from league data, so a page
+     already drawn for the other league is now wrong. Marking them
+     unloaded makes each redraw the next time it is opened, and the
+     one on screen is redrawn straight away.
+
+     Without this, switching league left whichever page you were on
+     showing the previous league's numbers under the new league's
+     name - wrong, and wrong in a way that looks fine.               */
+  loaded.league = false;
+  loaded.h2h    = false;
+  loaded.cup    = false;
+  loaded.squads = false;
+
+  sqTeam = null;
+
+  if (typeof route !== 'undefined' && bootDone) redrawCurrent();
+}
+
+var bootDone = false;
+
+/* Redraw whichever page is showing, without touching the others. */
+function redrawCurrent(){
+  if (route === 'league')      renderLeague();
+  else if (route === 'h2h')    renderH2H();
+  else if (route === 'cup')    renderCup();
+  else if (route === 'squads') renderSquads();
+  else if (route === 'home')   { loaded.home = false; renderHome(); }
 }
 
 /* =====================================================================
@@ -839,19 +1048,73 @@ function boot(){
     );
   });
 
+  /* colours first - every page reads them, and a page that renders
+     before they arrive would show the fallback greys and then flicker */
+  jobs.push(fetchSheet(SHARED,'kits').then(parseKits).catch(function(){ return null; })
+    .then(function(k){ DATA.kits = k; }));
+
+  jobs.push(fetchSheet(SHARED,'superliga').then(parseCupGroups).catch(function(){ return null; })
+    .then(function(x){ DATA.superliga = x; }));
+  jobs.push(fetchSheet(SHARED,'apertura').then(parseCupGroups).catch(function(){ return null; })
+    .then(function(x){ DATA.apertura = x; }));
+  jobs.push(fetchSheet(SHARED,'clausura').then(parseCupGroups).catch(function(){ return null; })
+    .then(function(x){ DATA.clausura = x; }));
+  jobs.push(fetchSheet(SHARED,'aperturaKO').then(parseKO).catch(function(){ return null; })
+    .then(function(x){ DATA.aperturaKO = x; }));
+  jobs.push(fetchSheet(SHARED,'clausuraKO').then(parseKO).catch(function(){ return null; })
+    .then(function(x){ DATA.clausuraKO = x; }));
+
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(fetchSheet(lg,'squads').then(parseSquads).catch(function(){ return null; })
+      .then(function(x){
+        if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+        DATA.byLeague[lg.key].squads = x;
+      }));
+  });
+
   var L1 = CONFIG.leagues[0];
   jobs.push(fetchSheet(L1,'transfers').then(parseTransfers).catch(function(){ return null; })
     .then(function(p){ DATA.players = p; }));
-  jobs.push(fetchSheet(L1,'h2h').then(parseH2H).catch(function(){ return null; })
-    .then(function(x){ DATA.h2h = x; }));
-  jobs.push(fetchSheet(L1,'cupGroups').then(parseCupGroups).catch(function(){ return null; })
-    .then(function(x){ DATA.cup = x; }));
-  jobs.push(fetchSheet(L1,'h2hKO').then(parseKO).catch(function(){ return null; })
-    .then(function(x){ DATA.h2hKO = x; }));
-  jobs.push(fetchSheet(L1,'cupKO').then(parseKO).catch(function(){ return null; })
-    .then(function(x){ DATA.cupKO = x; }));
-  jobs.push(fetchSheet(L1,'h2hForm').then(parseH2HForm).catch(function(){ return null; })
-    .then(function(x){ DATA.h2hForm = x; }));
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(fetchSheet(lg,'h2h').then(parseH2H).catch(function(){ return null; })
+      .then(function(x){
+        if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+        DATA.byLeague[lg.key].h2h = x;
+        if (lg.key === 'L1') DATA.h2h = x;
+      }));
+  });
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(fetchSheet(lg,'cupGroups').then(parseCupGroups).catch(function(){ return null; })
+      .then(function(x){
+        if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+        DATA.byLeague[lg.key].cup = x;
+        if (lg.key === 'L1') DATA.cup = x;
+      }));
+  });
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(fetchSheet(lg,'h2hKO').then(parseKO).catch(function(){ return null; })
+      .then(function(x){
+        if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+        DATA.byLeague[lg.key].h2hKO = x;
+        if (lg.key === 'L1') DATA.h2hKO = x;
+      }));
+  });
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(fetchSheet(lg,'cupKO').then(parseKO).catch(function(){ return null; })
+      .then(function(x){
+        if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+        DATA.byLeague[lg.key].cupKO = x;
+        if (lg.key === 'L1') DATA.cupKO = x;
+      }));
+  });
+  CONFIG.leagues.forEach(function(lg){
+    jobs.push(fetchSheet(lg,'h2hForm').then(parseH2HForm).catch(function(){ return null; })
+      .then(function(x){
+        if (!DATA.byLeague[lg.key]) DATA.byLeague[lg.key] = {};
+        DATA.byLeague[lg.key].h2hForm = x;
+        if (lg.key === 'L1') DATA.h2hForm = x;
+      }));
+  });
 
   Promise.all(jobs).then(function(){
     /* the Transfer Player List carries bonus and the player code, so
@@ -859,7 +1122,9 @@ function boot(){
     DATA.codes = codesFromTransfers(DATA.players);
     if (DATA.players) DATA.players.forEach(function(p){ p.bonus = p.bonus || 0; });
 
+    bootDone = false;
     useLeague(CONFIG.leagues[0].key);
+    bootDone = true;
     buildNav();
     renderHome();
     buildSidePanels();
@@ -886,9 +1151,18 @@ function codesFromTransfers(players){
 function renderHome(){
   var host = document.getElementById('p-home');
   if (loaded.home) return;
-  if (!DATA.table) {
+  /* A table that loaded but holds no rows is as unusable as one that
+     did not load - the page below reads t[0] straight away. Treating
+     them the same turns a blank white screen into a sentence.
+
+     It happens for real between a reset and the rebuild that follows
+     it, and pre-season before anyone has a squad.                    */
+  if (!DATA.table || !DATA.table.length) {
     clear(host);
-    var e1 = el('div','err','Could not load the league table sheet. Check it is still published to the web.');
+    var e1 = el('div','err', DATA.table
+      ? 'The league table is empty. Rebuild it from the sheet, or wait for the '
+        + 'first gameweek if the season has not started.'
+      : 'Could not load the league table sheet. Check it is still published to the web.');
     host.appendChild(e1);
     return;
   }
@@ -1197,7 +1471,6 @@ function buildLeagueSwitch(host){
       if (playTimer) { clearInterval(playTimer); playTimer = null; }
       pinned = null;
       useLeague(lg.key);
-      renderLeague();
     });
     bar.appendChild(b);
   });
@@ -1209,7 +1482,7 @@ function renderLeague(){
   var host = document.getElementById('p-league');
   clear(host);
 
-  if (!DATA.table || !DATA.gw){
+  if (!DATA.table || !DATA.table.length || !DATA.gw){
     host.appendChild(el('div','err',
       'Could not load ' + LEAGUE.name + '. Check the sheet is still published to the web.'));
     buildLeagueSwitch(host);
@@ -2145,23 +2418,196 @@ function cupKnockout(host){
    ===================================================================== */
 var sqTeam = null;
 
+/* =====================================================================
+   SQUADS
+
+   Each manager's fifteen, in their own colours: the heading block is
+   their Main with their Text on it, the strip beneath is their Second
+   with their 4th on it. That pairing is why the 4th colour exists.
+
+   Points in XI is what a player has actually contributed. Points Total
+   is everything they scored while in the squad, started or not. The
+   gap between the two is the bench, and it is the most interesting
+   number on the page - it is what a manager paid for and did not use.
+   ===================================================================== */
+
 function renderSquads(){
   var host = document.getElementById('p-squads');
   if (loaded.squads) return;
   loaded.squads = true;
   clear(host);
+  paintSquads(host);
+}
 
-  /* The 25/26 workbook wrote one published tab per manager and this
-     page read those. The new script does not - squads come from the
-     picks and the register instead, which also makes points
-     contributed and XI% possible for the first time. So this page is
-     being rebuilt rather than repointed.                            */
-  var box = el('div','note');
-  box.style.margin = '28px 24px';
-  box.textContent = 'The Squads page is being rebuilt against the new data. It will show each '
-    + 'manager\u2019s fifteen, what they cost, points contributed and how often each player '
-    + 'made the eleven \u2014 none of which the old version could do.';
-  host.appendChild(box);
+function paintSquads(host){
+  clear(host);
+
+  var data = (DATA.byLeague[LEAGUE.key] || {}).squads;
+
+  if (!data || !data.summary.length){
+    var note = el('div','note');
+    note.style.margin = '28px 24px';
+    note.textContent = 'No squads yet. They appear once the draft has happened, '
+      + 'or once FPL starts reporting ownership.';
+    host.appendChild(note);
+    return;
+  }
+
+  /* pick a manager - defaults to whoever is top on points in the XI */
+  var names = data.summary.map(function(m){ return m.name; });
+  if (!sqTeam || names.indexOf(sqTeam) < 0) sqTeam = names[0];
+
+  /* ---- the manager strip ---- */
+  var strip = el('div');
+  strip.style.cssText = 'display:flex;gap:6px;overflow-x:auto;padding:16px 24px 8px';
+
+  data.summary.forEach(function(m){
+    var k = kitFor(m.name);
+    var on = m.name === sqTeam;
+
+    var b = el('button');
+    b.style.cssText = 'flex:0 0 auto;border:none;cursor:pointer;padding:9px 13px;'
+      + 'border-radius:3px;font:inherit;font-size:12px;font-weight:700;text-align:left;'
+      + 'line-height:1.25;min-width:96px;'
+      + 'background:' + k.main + ';color:' + k.text + ';'
+      + 'outline:' + (on ? '2px solid #141414' : '2px solid transparent') + ';'
+      + 'outline-offset:1px;opacity:' + (on ? '1' : '.72');
+    b.innerHTML = '<div>' + escapeHtml(m.name) + '</div>'
+      + '<div style="font-size:10px;font-weight:600;opacity:.85;margin-top:2px">'
+      + m.xiPts + ' pts</div>';
+    b.addEventListener('click', function(){ sqTeam = m.name; paintSquads(host); });
+    strip.appendChild(b);
+  });
+  host.appendChild(strip);
+
+  var mine = data.byManager[sqTeam];
+  if (!mine) return;
+  var sum = mine.summary || {};
+  var kit = kitFor(sqTeam);
+
+  /* ---- header block: Main with Text on it ---- */
+  var head = el('div');
+  head.style.cssText = 'margin:12px 24px 0;padding:18px 20px 16px;border-radius:3px 3px 0 0;'
+    + 'background:' + kit.main + ';color:' + kit.text;
+
+  var h = el('div');
+  h.style.cssText = 'font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.1';
+  h.textContent = sqTeam;
+  head.appendChild(h);
+
+  if (sum.real){
+    var sub = el('div');
+    sub.style.cssText = 'font-size:12px;font-weight:600;opacity:.85;margin-top:3px';
+    sub.textContent = sum.real + (kit.kit ? '  \u00b7  ' + kit.kit : '');
+    head.appendChild(sub);
+  }
+  host.appendChild(head);
+
+  /* ---- stat strip: Second with 4th on it ---- */
+  var bar = el('div');
+  bar.style.cssText = 'margin:0 24px;padding:11px 20px;display:flex;gap:26px;flex-wrap:wrap;'
+    + 'background:' + kit.second + ';color:' + kit.fourth;
+
+  function stat(label, value){
+    var d = el('div');
+    d.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;'
+      + 'text-transform:uppercase;opacity:.75">' + escapeHtml(label) + '</div>'
+      + '<div style="font-size:16px;font-weight:800;margin-top:1px;'
+      + 'font-variant-numeric:tabular-nums">' + escapeHtml(String(value)) + '</div>';
+    bar.appendChild(d);
+  }
+
+  stat('Players', sum.count);
+  if (sum.spent !== null && sum.spent !== undefined){
+    stat('Spent', sum.spent.toFixed(1) + 'm');
+    stat('Budget left', sum.remaining.toFixed(1) + 'm');
+  }
+  stat('Points in XI', sum.xiPts);
+  stat('Squad points', sum.squadPts);
+  stat('On the bench', sum.squadPts - sum.xiPts);
+  host.appendChild(bar);
+
+  /* ---- the fifteen ---- */
+  var wrap = el('div');
+  wrap.style.cssText = 'margin:0 24px 34px;background:#fff;border:1px solid #e3e8ee;'
+    + 'border-top:none;border-radius:0 0 3px 3px;overflow-x:auto';
+
+  var t = el('table');
+  t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px';
+
+  var hasFees = mine.players.some(function(p){ return p.fee !== null; });
+
+  var cols = ['Player','Pos','Club'];
+  if (hasFees) cols.push('Fee');
+  cols = cols.concat(['Starts','Pts in XI','Pts total','PPG']);
+
+  var thead = el('thead'), htr = el('tr');
+  cols.forEach(function(c, i){
+    var th = el('th', null, c);
+    th.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.09em;'
+      + 'text-transform:uppercase;color:#8a939c;padding:9px 12px;'
+      + 'border-bottom:1px solid #e3e8ee;white-space:nowrap;text-align:'
+      + (i < 3 ? 'left' : 'right');
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr); t.appendChild(thead);
+
+  var tb = el('tbody');
+  var lastPos = null;
+
+  mine.players.forEach(function(p){
+    var tr = el('tr');
+    /* a faint rule where the position changes, so the shape of the
+       squad reads at a glance without a heading row per group */
+    var newBlock = lastPos !== null && p.pos !== lastPos;
+    lastPos = p.pos;
+
+    var cells = [
+      ['<b>' + escapeHtml(p.name) + '</b>', 'l'],
+      [posPill(p.pos), 'l'],
+      [escapeHtml(p.club), 'l']
+    ];
+    if (hasFees) cells.push([p.fee === null ? '' : p.fee.toFixed(1) + 'm', 'r']);
+    cells.push(
+      [String(p.starts), 'r'],
+      ['<b>' + p.xiPts + '</b>', 'r'],
+      [String(p.totalPts), 'r'],
+      [p.starts ? p.ppg.toFixed(1) : '-', 'r']
+    );
+
+    cells.forEach(function(c){
+      var td = el('td');
+      td.innerHTML = c[0];
+      td.style.cssText = 'padding:8px 12px;border-bottom:1px solid #f1f4f7;'
+        + 'text-align:' + (c[1] === 'l' ? 'left' : 'right')
+        + ';white-space:nowrap;font-variant-numeric:tabular-nums;'
+        + (newBlock ? 'border-top:1px solid #e3e8ee;' : '');
+      tr.appendChild(td);
+    });
+
+    /* a player who has never made the eleven is dimmed - money sitting
+       on the bench is the thing worth noticing */
+    if (!p.starts) tr.style.opacity = '.55';
+    tb.appendChild(tr);
+  });
+
+  t.appendChild(tb);
+  wrap.appendChild(t);
+  host.appendChild(wrap);
+}
+
+function posPill(pos){
+  var c = { GK:['#eef6ff','#1d4ed8'], DEF:['#effaf1','#15803d'],
+            MID:['#fffbeb','#a16207'], FWD:['#fff1f3','#be123c'] }[pos]
+        || ['#f1f4f7','#5a636c'];
+  return '<span style="display:inline-block;padding:2px 7px;border-radius:2px;'
+    + 'font-size:10px;font-weight:700;background:' + c[0] + ';color:' + c[1] + '">'
+    + escapeHtml(pos) + '</span>';
+}
+
+function escapeHtml(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 /* =====================================================================
