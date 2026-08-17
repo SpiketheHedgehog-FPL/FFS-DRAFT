@@ -394,6 +394,9 @@ img{display:block;max-width:100%}
     <section class="page" id="p-managers"><div class="load"><div class="spin"></div>Loading managers</div></section>
     <section class="page" id="p-players"><div class="load"><div class="spin"></div>Loading players</div></section>
     <section class="page" id="p-portal"><div class="load"><div class="spin"></div>Loading transfer portal</div></section>
+    <section class="page" id="p-sliga"><div class="load"><div class="spin"></div>Loading SuperLiga</div></section>
+    <section class="page" id="p-super"><div class="load"><div class="spin"></div>Loading Supercopa</div></section>
+    <section class="page" id="p-honours"><div class="load"><div class="spin"></div>Loading honours</div></section>
     <section class="page" id="p-stub"></section>
   </main>
 </div>
@@ -692,7 +695,12 @@ function parseGwScores(rows){
       var raw = r[c];
       var has = !(raw === undefined || raw === null || String(raw).trim() === '');
       if (has) anyIn[k] = true;
-      series.push(has ? num(raw) : 0);
+      /* null, not zero. A gameweek nobody has played is not a
+         gameweek everybody drew nil-nil - and before the season
+         starts that is every gameweek, so flattening the two turned
+         a blank workbook into a full season of draws. Consumers all
+         run this through num(), which reads null as 0 anyway. */
+      series.push(has ? num(raw) : null);
     });
     byName[nm] = series;
   });
@@ -1538,8 +1546,10 @@ function parseH2HForm(rows){
 var LEAGUE = CONFIG.leagues[0];
 var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2hForm:null,
              players:null, codes:null, bonus:null, squads:{}, byLeague:{},
-             fixtures:[], scores:{}, positions:null };
-var loaded = { home:false, league:false, h2h:false, cup:false, managers:false, players:false, portal:false };
+             fixtures:[], scores:{}, positions:null,
+             motm:[], champions:[], historic:[] };
+var loaded = { home:false, league:false, h2h:false, cup:false, managers:false,
+               players:false, portal:false, sliga:false, super:false, honours:false };
 var route = 'home';
 
 function leagueByKey(key){
@@ -1605,11 +1615,12 @@ var NAV = [
   { key:'league', label:'League Table' },
   { key:'h2h',    label:'Head to Head' },
   { key:'cup',    label:'Cup' },
-  { key:'super',  label:'Supercopa',    stub:true },
+  { key:'sliga',  label:'SuperLiga' },
+  { key:'super',  label:'Supercopa' },
   { key:'managers', label:'Managers' },
   { key:'players',label:'Players' },
   { key:'portal', label:'Transfer Portal' },
-  { key:'honours',label:'Honours',      stub:true }
+  { key:'honours',label:'Honours' }
 ];
 
 function buildNav(){
@@ -1625,7 +1636,8 @@ function buildNav(){
 function go(key){
   route = key;
   buildNav();
-  var known = ['home','league','h2h','cup','managers','players','portal'].indexOf(key) >= 0;
+  var known = ['home','league','h2h','cup','sliga','super','managers','players',
+               'portal','honours'].indexOf(key) >= 0;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('on'); });
   buildLeagueBar();
   if (key === 'home')       { document.getElementById('p-home').classList.add('on'); renderHome(); }
@@ -1635,6 +1647,9 @@ function go(key){
   else if (key === 'managers'){ document.getElementById('p-managers').classList.add('on'); renderManagers(); }
   else if (key === 'players'){ document.getElementById('p-players').classList.add('on'); renderPlayers(); }
   else if (key === 'portal'){ document.getElementById('p-portal').classList.add('on'); renderPortal(); }
+  else if (key === 'sliga'){ document.getElementById('p-sliga').classList.add('on'); renderSuperLiga(); }
+  else if (key === 'super'){ document.getElementById('p-super').classList.add('on'); renderSupercopa(); }
+  else if (key === 'honours'){ document.getElementById('p-honours').classList.add('on'); renderHonours(); }
   else {
     var s = document.getElementById('p-stub');
     s.classList.add('on');
@@ -1694,6 +1709,13 @@ function boot(){
      the sheet so the standings rules live in one place only */
   jobs.push(fetchSheet(SHARED,'positions').then(parsePositions).catch(function(){ return null; })
     .then(function(p){ DATA.positions = p; }));
+
+  jobs.push(fetchSheet(SHARED,'motm').then(parseMotm).catch(function(){ return []; })
+    .then(function(m){ DATA.motm = m; }));
+  jobs.push(fetchSheet(SHARED,'champions').then(parseChampions).catch(function(){ return []; })
+    .then(function(c){ DATA.champions = c; }));
+  jobs.push(fetchSheet(SHARED,'historic').then(parseChampions).catch(function(){ return []; })
+    .then(function(h){ DATA.historic = h; }));
 
   jobs.push(fetchSheet(SHARED,'superliga').then(parseCupGroups).catch(function(){ return null; })
     .then(function(x){ DATA.superliga = x; }));
@@ -2327,7 +2349,10 @@ function tableAt(gw){
     }
     var slice = series.slice(0, gw);
     var total = 0, low = Infinity, high = 0;
-    slice.forEach(function(v){ total += v; if (v > 0 && v < low) low = v; if (v > high) high = v; });
+    slice.forEach(function(raw){
+      var v = num(raw);
+      total += v; if (v > 0 && v < low) low = v; if (v > high) high = v;
+    });
     out.push({
       name: t.name,
       points: total,
@@ -3887,6 +3912,589 @@ function note_(text){
   var n = el('div','note', text);
   n.style.cssText = 'margin:24px 0;font-size:13px;color:#5a6570';
   return n;
+}
+
+/* =====================================================================
+   SUPERLIGA
+   All 22 in one table, everyone against everyone twice. No groups, no
+   knockout - the table at GW38 is the answer, so the page is the table
+   and the fixtures that made it.
+   ===================================================================== */
+
+function renderSuperLiga(){
+  var host = document.getElementById('p-sliga');
+  if (loaded.sliga) return;
+  loaded.sliga = true;
+  clear(host);
+
+  var g = DATA.superliga;
+  var table = g && (g.table || g.groups && g.groups['']) || (g && g.a) || null;
+  if (!table || !table.length){
+    host.appendChild(bigNote_('SuperLiga has not been built yet. Generate its fixtures '
+      + 'and rebuild it from the sheet.'));
+    return;
+  }
+
+  host.appendChild(compMast_('SuperLiga', 'superliga', '#0B7A4B',
+    'ALL 22 MANAGERS  \u00b7  GW1-38  \u00b7  EVERYONE TWICE'));
+
+  var pad = el('div');
+  pad.style.cssText = 'padding:0 24px 36px';
+  host.appendChild(pad);
+
+  pad.appendChild(standingsTable_(table, { qualify: 0, accent: '#0B7A4B' }));
+
+  if (g.fixtures && g.fixtures.length){
+    pad.appendChild(sectionHead_('Fixtures', '#0B7A4B'));
+    pad.appendChild(fixtureBlock_(g.fixtures));
+  }
+}
+
+/* =====================================================================
+   SUPERCOPA
+   Two halves, four groups each, then a two-legged knockout, then the
+   Copa del Campeones between the two winners.
+   ===================================================================== */
+
+var SC_HALF = 'apertura';
+
+function renderSupercopa(){
+  var host = document.getElementById('p-super');
+  if (loaded.super) return;
+  loaded.super = true;
+  paintSupercopa(host);
+}
+
+function paintSupercopa(host){
+  clear(host);
+
+  host.appendChild(compMast_('Supercopa', 'supercopa', '#C9A227',
+    'ALL 22  \u00b7  APERTURA GW1-18  \u00b7  CLAUSURA GW19-36  \u00b7  COPA GW37-38'));
+
+  var tabs = el('div');
+  tabs.style.cssText = 'margin:0 24px;display:flex;gap:2px;border-bottom:1px solid #e3e8ee';
+  [['apertura','Apertura'],['clausura','Clausura'],['copa','Copa del Campeones']]
+    .forEach(function(v){
+      var on = SC_HALF === v[0];
+      var b = el('button', null, v[1]);
+      b.style.cssText = 'font:inherit;font-size:12px;font-weight:' + (on ? '800' : '600')
+        + ';cursor:pointer;background:none;border:none;padding:12px 14px;white-space:nowrap;'
+        + 'color:' + (on ? '#C9A227' : '#5a6570')
+        + ';border-bottom:3px solid ' + (on ? '#C9A227' : 'transparent');
+      b.addEventListener('click', function(){
+        if (SC_HALF === v[0]) return;
+        SC_HALF = v[0];
+        paintSupercopa(host);
+      });
+      tabs.appendChild(b);
+    });
+  host.appendChild(tabs);
+
+  var pad = el('div');
+  pad.style.cssText = 'padding:0 24px 36px';
+  host.appendChild(pad);
+
+  if (SC_HALF === 'copa'){ copaPanel_(pad); return; }
+
+  var g = SC_HALF === 'apertura' ? DATA.apertura : DATA.clausura;
+  if (!g || !g.groups || !Object.keys(g.groups).length){
+    pad.appendChild(bigNote_('This half has not been built yet. Fill in the Group Draws, '
+      + 'generate the Supercopa fixtures and rebuild it.'));
+    return;
+  }
+
+  Object.keys(g.groups).sort().forEach(function(letter){
+    var teams = g.groups[letter];
+    if (!teams || !teams.length) return;
+    pad.appendChild(sectionHead_('Group ' + letter + '  \u00b7  ' + teams.length + ' teams',
+      '#C9A227'));
+    pad.appendChild(standingsTable_(teams, { qualify: 3, accent: '#C9A227' }));
+  });
+
+  if (g.fixtures && g.fixtures.length){
+    pad.appendChild(sectionHead_('Fixtures', '#C9A227'));
+    pad.appendChild(fixtureBlock_(g.fixtures));
+  }
+
+  /* the two-legged knockout, straight off the Fixtures sheet */
+  var compName = 'Supercopa ' + (SC_HALF === 'apertura' ? 'Apertura' : 'Clausura');
+  var ko = knockoutTies_(compName);
+  if (ko.length){
+    pad.appendChild(sectionHead_('Knockout', '#C9A227'));
+    pad.appendChild(knockoutBlock_(ko));
+  }
+}
+
+/* Ties assembled from the fixture rows. Each is two legs tagged
+   M<n> leg 1 and M<n> leg 2, so they pair on the tie number and the
+   aggregate is simply each manager's two scores added together. */
+function knockoutTies_(comp){
+  var stages = { 'Play-off':1, 'Quarter-final':2, 'Semi-final':3, 'Final':4 };
+  var byTie = {};
+
+  (DATA.fixtures || []).forEach(function(f){
+    if (f.comp !== comp) return;
+    if (!stages[f.stage]) return;
+    var m = String(f.note || '').match(/^M(\d+)\s+leg\s+(\d+)/i);
+    if (!m) return;
+    var id = m[1], leg = num(m[2]);
+    if (!byTie[id]) byTie[id] = { id: num(id), stage: f.stage, legs: {} };
+    byTie[id].legs[leg] = f;
+  });
+
+  return Object.keys(byTie).map(function(k){ return byTie[k]; })
+    .filter(function(t){ return t.legs[1]; })
+    .sort(function(a,b){
+      return (stages[a.stage] - stages[b.stage]) || (a.id - b.id);
+    });
+}
+
+function knockoutBlock_(ties){
+  var wrap = el('div');
+  var lastStage = null;
+
+  ties.forEach(function(t){
+    if (t.stage !== lastStage){
+      lastStage = t.stage;
+      var h = el('div', null, t.stage.toUpperCase());
+      h.style.cssText = 'font-size:9px;font-weight:800;letter-spacing:1.3px;color:#8a939c;'
+        + 'margin:14px 0 6px';
+      wrap.appendChild(h);
+    }
+
+    var l1 = t.legs[1], l2 = t.legs[2];
+    var home = l1.home, away = l1.away;
+    var sc = DATA.scores;
+
+    function pt(n, gw){ var v = sc[n] && sc[n][gw]; return v === undefined ? null : num(v); }
+    var h1 = pt(home, l1.gw), a1 = pt(away, l1.gw);
+    var h2 = l2 ? pt(home, l2.gw) : null, a2 = l2 ? pt(away, l2.gw) : null;
+    var done = h1 !== null && a1 !== null && h2 !== null && a2 !== null;
+    var hAgg = done ? h1 + h2 : null, aAgg = done ? a1 + a2 : null;
+
+    var row = el('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 0;'
+      + 'border-bottom:0.5px solid #f2f4f7';
+    row.appendChild(cell_('M' + t.id, 'width:34px;font-size:10px;font-weight:700;color:#8a939c'));
+    row.appendChild(cell_(home, 'flex:1;font-size:13px;font-weight:'
+      + (done && hAgg >= aAgg ? '800' : '600') + ';color:#0C2340;text-align:right'));
+    row.appendChild(cell_(done ? hAgg + ' - ' + aAgg : 'v',
+      'width:74px;text-align:center;font-size:14px;font-weight:800;color:#0C2340'));
+    row.appendChild(cell_(away, 'flex:1;font-size:13px;font-weight:'
+      + (done && aAgg > hAgg ? '800' : '600') + ';color:#0C2340'));
+    row.appendChild(cell_(done ? '(' + h1 + '-' + a1 + ', ' + h2 + '-' + a2 + ')' : 'GW'
+      + l1.gw + (l2 ? ' & ' + l2.gw : ''),
+      'width:132px;text-align:right;font-size:10px;color:#8a939c'));
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+function copaPanel_(pad){
+  var ties = knockoutTies_('Copa del Campeones');
+  pad.appendChild(sectionHead_('Copa del Campeones  \u00b7  GW37 and GW38', '#8B1E33'));
+
+  if (!ties.length){
+    pad.appendChild(bigNote_('TBC \u2014 the Copa is decided at GW36, when both Supercopa '
+      + 'finals have been played. The Apertura winner meets the Clausura winner over two '
+      + 'legs. If the same manager wins both, the two losing finalists compete for the '
+      + 'second place.'));
+    return;
+  }
+  pad.appendChild(knockoutBlock_(ties));
+}
+
+/* =====================================================================
+   SHARED COMPETITION FURNITURE
+   ===================================================================== */
+
+function compMast_(title, imgKey, accent, meta){
+  var mast = el('div');
+  mast.style.cssText = 'margin:0 24px;display:flex;align-items:center;gap:14px;'
+    + 'padding:18px 20px;background:' + accent + ';color:#fff';
+
+  var slot = el('div');
+  slot.style.cssText = 'width:52px;height:52px;flex-shrink:0;display:flex;'
+    + 'align-items:center;justify-content:center';
+  slot.appendChild(imgTry(CONFIG.img.comp(imgKey), function(){
+    slot.style.border = '1px dashed rgba(255,255,255,.5)';
+    slot.textContent = 'LOGO';
+    slot.style.fontSize = '8px';
+    slot.style.fontWeight = '800';
+  }));
+  var si = slot.firstChild;
+  if (si && si.style) si.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+  mast.appendChild(slot);
+
+  var t = el('div');
+  t.appendChild(cell_(title,
+    'display:block;font-size:26px;font-weight:800;letter-spacing:-.8px;line-height:1.05'));
+  t.appendChild(cell_(meta,
+    'display:block;font-size:9px;font-weight:700;letter-spacing:1.2px;opacity:.8;margin-top:3px'));
+  mast.appendChild(t);
+
+  var wrap = el('div');
+  wrap.appendChild(mast);
+  var trim = el('div');
+  trim.style.cssText = 'margin:0 24px 16px;height:4px;background:#0C2340';
+  wrap.appendChild(trim);
+  return wrap;
+}
+
+function sectionHead_(text, accent){
+  var h = el('div');
+  h.style.cssText = 'display:flex;align-items:center;gap:9px;margin:22px 0 8px';
+  h.appendChild(cell_(text.toUpperCase(),
+    'font-size:10px;font-weight:800;letter-spacing:1.3px;color:' + accent));
+  var ln = el('span');
+  ln.style.cssText = 'flex:1;height:2px;background:' + accent + ';opacity:.25';
+  h.appendChild(ln);
+  return h;
+}
+
+function standingsTable_(rows, opt){
+  var wrap = el('div');
+  var head = el('div');
+  head.style.cssText = 'display:flex;gap:8px;padding:8px 0 6px;border-bottom:0.5px solid #dbe2e9;'
+    + 'font-size:9px;font-weight:700;letter-spacing:.8px;color:#8a939c';
+  [['','width:26px'],['','width:26px'],['MANAGER','flex:1'],
+   ['PLD','width:34px;text-align:right'],['W','width:26px;text-align:right'],
+   ['D','width:26px;text-align:right'],['L','width:26px;text-align:right'],
+   ['F','width:48px;text-align:right'],['PD','width:48px;text-align:right'],
+   ['PTS','width:38px;text-align:right']].forEach(function(c){
+    head.appendChild(cell_(c[0], c[1]));
+  });
+  wrap.appendChild(head);
+
+  rows.forEach(function(t, i){
+    var kit = kitFor(t.name);
+    var row = el('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:7px 0;'
+      + 'border-bottom:0.5px solid #f2f4f7';
+
+    var q = el('span');
+    q.style.cssText = 'width:26px;display:flex;align-items:center;gap:4px';
+    var num_ = el('span', null, String(i + 1));
+    num_.style.cssText = 'font-size:11px;font-weight:700;color:#8a939c';
+    q.appendChild(num_);
+    if (opt.qualify && i < opt.qualify){
+      var dot = el('span');
+      dot.style.cssText = 'width:4px;height:14px;background:' + opt.accent;
+      q.appendChild(dot);
+    }
+    row.appendChild(q);
+
+    var av = el('span');
+    av.style.cssText = 'width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+      + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;'
+      + 'align-items:center;justify-content:center;font-size:9px;font-weight:800';
+    av.appendChild(imgTry(CONFIG.img.manager(t.name), function(){
+      av.textContent = t.name.substring(0,2).toUpperCase();
+    }));
+    var ai = av.firstChild;
+    if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    row.appendChild(av);
+
+    row.appendChild(cell_(t.name, 'flex:1;font-size:13px;font-weight:700;color:#0C2340'));
+    row.appendChild(cell_(String(t.played === undefined ? t.pld : t.played),
+      'width:34px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(t.w), 'width:26px;text-align:right;font-size:12px;font-weight:800;color:#0C2340'));
+    row.appendChild(cell_(String(t.d), 'width:26px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(t.l), 'width:26px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(t.f), 'width:48px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_((t.pd > 0 ? '+' : '') + t.pd,
+      'width:48px;text-align:right;font-size:12px;color:'
+      + (t.pd > 0 ? '#2d7a2d' : t.pd < 0 ? '#c0392b' : '#5a6570')));
+    row.appendChild(cell_(String(t.pts),
+      'width:38px;text-align:right;font-size:15px;font-weight:800;color:#0C2340'));
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+function fixtureBlock_(fixtures){
+  var wrap = el('div');
+  var byGw = {}, order = [];
+  fixtures.forEach(function(f){
+    if (!byGw[f.gw]) { byGw[f.gw] = []; order.push(f.gw); }
+    byGw[f.gw].push(f);
+  });
+  order.sort(function(a,b){ return a - b; });
+
+  order.forEach(function(gw){
+    var h = el('div', null, 'GAMEWEEK ' + gw);
+    h.style.cssText = 'font-size:9px;font-weight:800;letter-spacing:1.2px;color:#8a939c;'
+      + 'margin:12px 0 4px';
+    wrap.appendChild(h);
+
+    byGw[gw].forEach(function(f){
+      var done = f.hs !== '' && f.hs !== undefined && f.as !== '' && f.as !== undefined;
+      var row = el('div');
+      row.style.cssText = 'display:flex;gap:10px;align-items:center;padding:5px 0;'
+        + 'border-bottom:0.5px solid #f2f4f7';
+      row.appendChild(cell_(f.home, 'flex:1;text-align:right;font-size:12px;font-weight:'
+        + (done && num(f.hs) > num(f.as) ? '800' : '600') + ';color:#0C2340'));
+      row.appendChild(cell_(done ? num(f.hs) + ' - ' + num(f.as) : 'v',
+        'width:66px;text-align:center;font-size:12px;font-weight:800;color:'
+        + (done ? '#0C2340' : '#a3adb7')));
+      row.appendChild(cell_(f.away, 'flex:1;font-size:12px;font-weight:'
+        + (done && num(f.as) > num(f.hs) ? '800' : '600') + ';color:#0C2340'));
+      wrap.appendChild(row);
+    });
+  });
+  return wrap;
+}
+
+function bigNote_(text){
+  var n = el('div');
+  n.style.cssText = 'margin:28px 24px;padding:18px 20px;background:#f7f9fb;'
+    + 'border-left:3px solid #dbe2e9;font-size:13px;line-height:1.6;color:#5a6570;max-width:640px';
+  n.textContent = text;
+  return n;
+}
+
+/* =====================================================================
+   HONOURS
+
+   The history: who won what, the manager of the month run, and the
+   outtakes. Everything here reads sheets you fill in by hand rather
+   than anything computed - it is a record, not a calculation.
+   ===================================================================== */
+
+var HON_VIEW = 'roll';
+
+/* USER_MOTM: Season | Team, newest first, "None" where a month held
+   no gameweeks. Anything that is not a real name is dropped. */
+function parseMotm(rows){
+  if (!rows || rows.length < 2) return [];
+  var out = [];
+  rows.slice(1).forEach(function(r){
+    var month = String(r[0] || '').trim();
+    var who = String(r[1] || '').trim();
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) return;
+    if (!who || who.toLowerCase() === 'none') return;
+    out.push({ month: month, name: who });
+  });
+  out.sort(function(a,b){ return a.month < b.month ? 1 : a.month > b.month ? -1 : 0; });
+  return out;
+}
+
+/* The archive tabs are yours, so this is deliberately forgiving about
+   their shape: it takes the first three columns it can make sense of
+   and does not insist on a header it has never seen. */
+function parseChampions(rows){
+  if (!rows || rows.length < 2) return [];
+  var out = [];
+  rows.slice(1).forEach(function(r){
+    var a = String(r[0] || '').trim();
+    var b = String(r[1] || '').trim();
+    var c = String(r[2] || '').trim();
+    if (!a && !b) return;
+    out.push({ season: a, comp: b, name: c, rest: r.slice(3) });
+  });
+  return out;
+}
+
+function renderHonours(){
+  var host = document.getElementById('p-honours');
+  if (loaded.honours) return;
+  loaded.honours = true;
+  paintHonours(host);
+}
+
+function paintHonours(host){
+  clear(host);
+
+  host.appendChild(compMast_('Honours', 'league', '#8B1E33',
+    'CHAMPIONS  \u00b7  MANAGER OF THE MONTH  \u00b7  OUTTAKES'));
+
+  var tabs = el('div');
+  tabs.style.cssText = 'margin:0 24px;display:flex;gap:2px;border-bottom:1px solid #e3e8ee';
+  [['roll','Roll of honour'],['motm','Manager of the Month'],['out','Outtakes']]
+    .forEach(function(v){
+      var on = HON_VIEW === v[0];
+      var b = el('button', null, v[1]);
+      b.style.cssText = 'font:inherit;font-size:12px;font-weight:' + (on ? '800' : '600')
+        + ';cursor:pointer;background:none;border:none;padding:12px 14px;white-space:nowrap;'
+        + 'color:' + (on ? '#8B1E33' : '#5a6570')
+        + ';border-bottom:3px solid ' + (on ? '#8B1E33' : 'transparent');
+      b.addEventListener('click', function(){
+        if (HON_VIEW === v[0]) return;
+        HON_VIEW = v[0];
+        paintHonours(host);
+      });
+      tabs.appendChild(b);
+    });
+  host.appendChild(tabs);
+
+  var pad = el('div');
+  pad.style.cssText = 'padding:0 24px 40px';
+  host.appendChild(pad);
+
+  if (HON_VIEW === 'motm') return honMotm(pad);
+  if (HON_VIEW === 'out')  return honOuttakes(pad);
+  honRoll(pad);
+}
+
+/* ---- roll of honour ---- */
+function honRoll(pad){
+  var all = (DATA.champions || []).concat(DATA.historic || []);
+  if (!all.length){
+    pad.appendChild(bigNote_('No history recorded yet. This reads your USER_CHAMPIONS and '
+      + 'USER_HISTORIC SEASONS tabs, so anything you add there appears here.'));
+    return;
+  }
+
+  var bySeason = {}, order = [];
+  all.forEach(function(r){
+    var k = r.season || 'Unknown';
+    if (!bySeason[k]) { bySeason[k] = []; order.push(k); }
+    bySeason[k].push(r);
+  });
+  order.sort(function(a,b){ return a < b ? 1 : a > b ? -1 : 0; });
+
+  order.forEach(function(season){
+    pad.appendChild(sectionHead_(season, '#8B1E33'));
+
+    var grid = el('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px';
+    bySeason[season].forEach(function(r){
+      var kit = r.name ? kitFor(r.name) : null;
+      var card = el('div');
+      card.style.cssText = 'display:flex;align-items:center;gap:11px;padding:12px 13px;'
+        + 'border-radius:3px;background:' + (kit ? kit.main : '#f1f4f7')
+        + ';color:' + (kit ? kit.text : '#5a6570');
+
+      var badge = el('span');
+      badge.style.cssText = 'width:38px;height:38px;flex-shrink:0;display:flex;'
+        + 'align-items:center;justify-content:center';
+      badge.appendChild(imgTry(CONFIG.img.champion(
+        slug(r.comp || ''), String(r.season || '').replace(/\D/g,'')), function(){
+        badge.style.background = 'rgba(255,255,255,.22)';
+        badge.style.borderRadius = '50%';
+      }));
+      var bi = badge.firstChild;
+      if (bi && bi.style) bi.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+      card.appendChild(badge);
+
+      var t = el('span');
+      t.appendChild(cell_(r.comp || '\u2013',
+        'display:block;font-size:9px;font-weight:700;letter-spacing:1.1px;opacity:.8'));
+      t.appendChild(cell_(r.name || 'TBC',
+        'display:block;font-size:17px;font-weight:800;letter-spacing:-.4px;line-height:1.1;margin-top:1px'));
+      card.appendChild(t);
+      grid.appendChild(card);
+    });
+    pad.appendChild(grid);
+  });
+}
+
+/* ---- manager of the month, as a collage ---- */
+function honMotm(pad){
+  var list = DATA.motm || [];
+  if (!list.length){
+    pad.appendChild(bigNote_('No months recorded yet. This reads your USER_MOTM tab, '
+      + 'so a month appears here as soon as you fill in a name against it.'));
+    return;
+  }
+
+  var wins = {};
+  list.forEach(function(m){ wins[m.name] = (wins[m.name] || 0) + 1; });
+  var board = Object.keys(wins).sort(function(a,b){
+    return wins[b] - wins[a] || a.localeCompare(b);
+  });
+
+  pad.appendChild(sectionHead_('Most awards', '#8B1E33'));
+  var bar = el('div');
+  bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px';
+  board.forEach(function(n){
+    var kit = kitFor(n);
+    var chip = el('div');
+    chip.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 11px;'
+      + 'border-radius:3px;background:' + kit.main + ';color:' + kit.text;
+    chip.appendChild(cell_(n, 'font-size:12px;font-weight:700'));
+    chip.appendChild(cell_(String(wins[n]), 'font-size:15px;font-weight:800'));
+    bar.appendChild(chip);
+  });
+  pad.appendChild(bar);
+
+  pad.appendChild(sectionHead_(list.length + ' months', '#8B1E33'));
+  var grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px';
+
+  list.forEach(function(m){
+    var kit = kitFor(m.name);
+    var card = el('div');
+    card.style.cssText = 'border-radius:3px;overflow:hidden;background:' + kit.main;
+
+    var pic = el('div');
+    pic.style.cssText = 'height:132px;background:rgba(255,255,255,.15);display:flex;'
+      + 'align-items:center;justify-content:center;overflow:hidden';
+    pic.appendChild(imgTry(CONFIG.img.motm(m.month), function(){
+      pic.textContent = monthLabel(m.month);
+      pic.style.color = kit.text;
+      pic.style.fontSize = '11px';
+      pic.style.fontWeight = '800';
+    }));
+    var pi = pic.firstChild;
+    if (pi && pi.style) pi.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    card.appendChild(pic);
+
+    var cap = el('div');
+    cap.style.cssText = 'padding:8px 10px;color:' + kit.text;
+    cap.appendChild(cell_(m.name,
+      'display:block;font-size:14px;font-weight:800;letter-spacing:-.3px;line-height:1.1'));
+    cap.appendChild(cell_(monthLabel(m.month),
+      'display:block;font-size:9px;font-weight:700;letter-spacing:.9px;opacity:.8;margin-top:2px'));
+    card.appendChild(cap);
+    grid.appendChild(card);
+  });
+  pad.appendChild(grid);
+}
+
+var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function monthLabel(m){
+  var p = String(m).split('-');
+  var i = num(p[1]) - 1;
+  return (MONTHS[i] || p[1]) + ' ' + p[0];
+}
+
+/* ---- outtakes ---- */
+function honOuttakes(pad){
+  var n = (CONFIG.img.outtakeCount || 0);
+  if (!n){
+    pad.appendChild(bigNote_('No outtakes configured.'));
+    return;
+  }
+
+  pad.appendChild(sectionHead_('Outtakes', '#8B1E33'));
+
+  var grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px';
+  var shown = 0;
+
+  for (var i = 1; i <= n; i++){
+    (function(k){
+      var cell = el('div');
+      cell.style.cssText = 'aspect-ratio:4/3;background:#f1f4f7;border-radius:3px;'
+        + 'overflow:hidden;display:flex;align-items:center;justify-content:center';
+      cell.appendChild(imgTry(CONFIG.img.outtake(k), function(){
+        /* a missing outtake leaves nothing behind rather than a gap */
+        if (cell.parentNode) cell.parentNode.removeChild(cell);
+      }));
+      var ci = cell.firstChild;
+      if (ci && ci.style) ci.style.cssText = 'width:100%;height:100%;object-fit:cover';
+      grid.appendChild(cell);
+      shown++;
+    })(i);
+  }
+  pad.appendChild(grid);
+
+  var note = el('div');
+  note.style.cssText = 'margin-top:14px;font-size:11px;color:#8a939c';
+  note.textContent = 'Add more by dropping them into img/outtakes as outtake-'
+    + (n + 1) + ' and raising the count.';
+  pad.appendChild(note);
 }
 
 /* =====================================================================
