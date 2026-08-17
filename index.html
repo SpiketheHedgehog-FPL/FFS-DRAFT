@@ -391,7 +391,7 @@ img{display:block;max-width:100%}
     <section class="page" id="p-league"><div class="load"><div class="spin"></div>Loading league table</div></section>
     <section class="page" id="p-h2h"><div class="load"><div class="spin"></div>Loading head to head</div></section>
     <section class="page" id="p-cup"><div class="load"><div class="spin"></div>Loading cup</div></section>
-    <section class="page" id="p-squads"><div class="load"><div class="spin"></div>Loading squads</div></section>
+    <section class="page" id="p-managers"><div class="load"><div class="spin"></div>Loading managers</div></section>
     <section class="page" id="p-players"><div class="load"><div class="spin"></div>Loading players</div></section>
     <section class="page" id="p-portal"><div class="load"><div class="spin"></div>Loading transfer portal</div></section>
     <section class="page" id="p-stub"></section>
@@ -473,7 +473,8 @@ var CONFIG = {
       historic:      '1572948097',
       players2526:   '554186143',
       gwPts2526:     '1785033753',
-      ledger:        '70428418'
+      ledger:        '70428418',
+      fixtures:      '727393446'
     }
   },
 
@@ -720,25 +721,69 @@ function parseH2H(rows){
 }
 
 /* Cup groups sheet - groups plus the fixture block beneath */
+/* Group tables. Written for the two-group cups, and now also used by
+   the Supercopa, which has four - so the group letter is read out of
+   the heading rather than assumed to be A or B.
+
+   .a and .b are kept as they were so the cup page did not need
+   rewriting; .groups holds every group by its letter.               */
 function parseCupGroups(rows){
-  var a = [], b = [], fixtures = [], where = '';
+  var groups = {}, fixtures = [], where = '';
+
   rows.forEach(function(r){
     var f0 = r[0] ? String(r[0]).trim() : '';
-    if (f0.indexOf('Group A') >= 0) { where = 'a'; return; }
-    if (f0.indexOf('Group B') >= 0) { where = 'b'; return; }
+
+    var m = f0.match(/^Group ([A-Z])\b/);
+    if (m) { where = m[1]; if (!groups[where]) groups[where] = []; return; }
+
     if (f0 === 'Fixtures' || (f0 === 'GW' && r[1] === 'Home')) { where = 'f'; return; }
     if (f0 === 'Pos') return;
+
     if (where === 'f' && f0.indexOf('GW') === 0){
       fixtures.push({ gw:num(f0.replace('GW','')), home:r[1], hs:r[2], as:r[3], away:r[4] });
       return;
     }
-    if ((where === 'a' || where === 'b') && f0 && !isNaN(f0)) {
-      var row = { pos:num(r[0]), name:String(r[1]).trim(), played:num(r[2]), w:num(r[3]),
-                  d:num(r[4]), l:num(r[5]), f:num(r[6]), pd:num(r[8]), pts:num(r[9]) };
-      (where === 'a' ? a : b).push(row);
+    if (groups[where] && f0 && !isNaN(f0)) {
+      groups[where].push({ pos:num(r[0]), name:String(r[1]).trim(), played:num(r[2]),
+        w:num(r[3]), d:num(r[4]), l:num(r[5]), f:num(r[6]), pd:num(r[8]), pts:num(r[9]) });
     }
   });
-  return { a: a, b: b, fixtures: fixtures };
+
+  return { a: groups.A || [], b: groups.B || [], groups: groups, fixtures: fixtures };
+}
+
+/* Fixtures sheet: competition | league_key | stage | gw | home | away | note
+
+   Every competition shares this one sheet, which is what makes a
+   combined record possible at all - one read gives every meeting
+   between any two managers, whichever competition it happened in.  */
+function parseFixtures(rows){
+  if (!rows || rows.length < 2) return [];
+  var out = [];
+  rows.forEach(function(r){
+    var comp = String(r[0] || '').trim();
+    var home = String(r[4] || '').trim();
+    var away = String(r[5] || '').trim();
+    var gw   = num(r[3]);
+    if (!comp || !home || !away || !gw) return;
+    if (comp === 'competition') return;
+    out.push({ comp: comp, leagueKey: String(r[1] || '').trim(),
+               stage: String(r[2] || '').trim(), gw: gw,
+               home: home, away: away, note: String(r[6] || '').trim() });
+  });
+  return out;
+}
+
+/* Every manager's gameweek scores, both leagues in one lookup.
+   A manager only appears in one league, so this is a join.         */
+function mergedScores(){
+  var out = {};
+  CONFIG.leagues.forEach(function(lg){
+    var d = DATA.byLeague[lg.key];
+    if (!d || !d.gw || !d.gw.byName) return;
+    Object.keys(d.gw.byName).forEach(function(n){ out[n] = d.gw.byName[n]; });
+  });
+  return out;
 }
 
 /* Transfer Player List */
@@ -797,6 +842,143 @@ function parsePhotoCodes(rows){
 }
 
 /* =====================================================================
+   TELLING TWO MANAGERS APART
+
+   The record bar puts one manager's colour against another's. Twenty
+   two kits chosen independently means some of them collide - and one
+   pair, Ben L and Tom W, is the same hex exactly, because they picked
+   the same City shirt.
+
+   Distance is measured in Lab rather than on the hex digits, because
+   hex arithmetic does not match what an eye does: two colours can be
+   numerically far apart and look identical, and the reverse.
+
+   The manager whose page you are on always keeps their own Main. The
+   opponent tries Main, then Second, then Text, and takes the first
+   that is far enough away. Across all 462 orderings that resolves
+   every pair - 424 keep their Main, 31 fall back to Second, 7 to
+   Text - so there is no need for a list of exceptions, and it will
+   cope with next season's kits without anyone remembering why.
+   ===================================================================== */
+
+var KIT_CLASH_LIMIT = 25;
+
+function labOf(hex){
+  var h = String(hex || '').replace('#','');
+  if (h.length !== 6) return [0,0,0];
+  var v = [0,2,4].map(function(i){
+    var c = parseInt(h.substr(i,2),16)/255;
+    return c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  });
+  var X = v[0]*0.4124 + v[1]*0.3576 + v[2]*0.1805;
+  var Y = v[0]*0.2126 + v[1]*0.7152 + v[2]*0.0722;
+  var Z = v[0]*0.0193 + v[1]*0.1192 + v[2]*0.9505;
+  function k(t){ return t > 0.008856 ? Math.pow(t, 1/3) : 7.787*t + 16/116; }
+  var fx = k(X/0.95047), fy = k(Y/1.0), fz = k(Z/1.08883);
+  return [116*fy - 16, 500*(fx - fy), 200*(fy - fz)];
+}
+
+function colourGap(a, b){
+  var x = labOf(a), y = labOf(b);
+  return Math.sqrt(Math.pow(x[0]-y[0],2) + Math.pow(x[1]-y[1],2) + Math.pow(x[2]-y[2],2));
+}
+
+/* What the opponent should be shown in, against a given manager.
+   Returns { bg, fg, using } where using is main, second or text.  */
+function opponentColour(mineName, theirName){
+  var mine = kitFor(mineName), them = kitFor(theirName);
+
+  var tries = [
+    { bg: them.main,   fg: them.text,   using: 'main'   },
+    { bg: them.second, fg: them.fourth, using: 'second' },
+    { bg: them.text,   fg: them.main,   using: 'text'   }
+  ];
+
+  for (var i = 0; i < tries.length; i++){
+    if (colourGap(mine.main, tries[i].bg) >= KIT_CLASH_LIMIT) return tries[i];
+  }
+  /* nothing separated - the last option is still the least bad */
+  return tries[tries.length - 1];
+}
+
+
+/* =====================================================================
+   ONE MANAGER'S SEASON
+   Every fixture they appear in, across every competition, with the
+   score attached where both sides have played.
+   ===================================================================== */
+
+function managerFixtures(name){
+  var fx = DATA.fixtures || [];
+  var sc = DATA.scores || {};
+  var out = [];
+
+  fx.forEach(function(f){
+    var home = f.home === name, away = f.away === name;
+    if (!home && !away) return;
+
+    var opp = home ? f.away : f.home;
+    /* a placeholder like "Winner of Apertura M4" is not a manager */
+    var real = !!(sc[opp] || (DATA.kits && DATA.kits[opp]) || CONFIG.managers[opp]);
+
+    var mine = sc[name] && sc[name][f.gw];
+    var theirs = sc[opp] && sc[opp][f.gw];
+    var played = mine !== undefined && mine !== '' && theirs !== undefined && theirs !== '';
+
+    out.push({
+      comp: f.comp, stage: f.stage, gw: f.gw, note: f.note,
+      opp: opp, oppReal: real, home: home,
+      mine: played ? num(mine) : null,
+      theirs: played ? num(theirs) : null,
+      played: played,
+      result: played ? (num(mine) > num(theirs) ? 'W' : num(mine) < num(theirs) ? 'L' : 'D') : ''
+    });
+  });
+
+  out.sort(function(a,b){ return a.gw - b.gw || String(a.comp).localeCompare(String(b.comp)); });
+  return out;
+}
+
+/* The combined head to head against every opponent, whichever
+   competition the meetings happened in. */
+function managerRecord(name){
+  var by = {};
+  managerFixtures(name).forEach(function(f){
+    if (!f.played || !f.oppReal) return;
+    if (!by[f.opp]) by[f.opp] = { opp:f.opp, p:0, w:0, d:0, l:0, f:0, a:0, fx:[] };
+    var r = by[f.opp];
+    r.p++; r.f += f.mine; r.a += f.theirs;
+    if (f.result === 'W') r.w++; else if (f.result === 'L') r.l++; else r.d++;
+    r.fx.push(f);
+  });
+  return Object.keys(by).map(function(k){ return by[k]; })
+    .sort(function(a,b){ return b.p - a.p || String(a.opp).localeCompare(String(b.opp)); });
+}
+
+/* Where a manager stands in a competition, read from the table the
+   sheet already built rather than worked out again here.           */
+function positionIn(comp, name){
+  function find(tab){
+    if (!tab) return null;
+    for (var i = 0; i < tab.length; i++) if (tab[i].name === name) return tab[i];
+    return null;
+  }
+  var sets = [];
+  if (DATA.h2h) sets.push(DATA.h2h.table);
+  if (DATA.cup) { sets.push(DATA.cup.a); sets.push(DATA.cup.b); }
+  [DATA.superliga, DATA.apertura, DATA.clausura].forEach(function(g){
+    if (!g) return;
+    if (g.table) sets.push(g.table);
+    if (g.groups) Object.keys(g.groups).forEach(function(k){ sets.push(g.groups[k]); });
+  });
+  for (var i = 0; i < sets.length; i++){
+    var hit = find(sets[i]);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/* =====================================================================
    PLAYER PHOTOS
    One place that decides which face belongs to which player, so no
    page has to work it out for itself.
@@ -852,8 +1034,46 @@ var PlayerPhotos = (function(){
      When the asset set rolls over - premierleague26 and so on - change
      SET below and nothing else needs touching.                       */
   var HOST  = 'https://resources.premierleague.com/';
-  var SET   = 'premierleague25';
-  var SIZES = ['110x140', '250x250'];
+
+  /* The asset set is versioned and rolls over between seasons. Rather
+     than hard-coding a guess, both are tried and the first that
+     answers is used for everything afterwards.
+
+     A single probe image decides it, once, at load. Guessing wrong
+     without the probe would mean either a season of stale faces or,
+     if the new set is not live yet, no faces at all - and neither
+     failure announces itself.                                       */
+  var SETS   = ['premierleague26', 'premierleague25'];
+  var SIZES  = ['110x140', '250x250'];
+  var PROBE  = '154561';          /* David Raya - known to exist */
+  var active = null;              /* set once the probe answers   */
+
+  /* Ask for one image from the newer set. If it loads, everything
+     uses it; if not, fall back to the older one. Costs one request. */
+  function probe(){
+    if (active) return;
+    var i = 0;
+    var im = new Image();
+    im.onload  = function(){ active = SETS[i]; };
+    im.onerror = function(){
+      i++;
+      if (i < SETS.length) { im.src = probeUrl(SETS[i]); return; }
+      active = SETS[SETS.length - 1];
+    };
+    im.src = probeUrl(SETS[0]);
+  }
+
+  function probeUrl(set){
+    return HOST + set + '/photos/players/' + SIZES[0] + '/' + PROBE + '.png';
+  }
+
+  /* The sets in the order worth trying: whichever the probe found
+     first, then the other, so a photo still appears even if the probe
+     has not come back yet.                                          */
+  function setOrder(){
+    if (!active) return SETS;
+    return [active].concat(SETS.filter(function(x){ return x !== active; }));
+  }
 
   function reset(){
     byId = {}; byName = {}; dropped = {}; built = false;
@@ -863,6 +1083,7 @@ var PlayerPhotos = (function(){
      ID column and a Code column for all 587.                        */
   function build(players){
     reset();
+    probe();
     if (!players || !players.length) return;
 
     var nameCount = {};
@@ -927,8 +1148,11 @@ var PlayerPhotos = (function(){
   }
 
   function urls(code){
-    var out = SIZES.map(function(sz){
-      return HOST + SET + '/photos/players/' + sz + '/' + code + '.png';
+    var out = [];
+    setOrder().forEach(function(set){
+      SIZES.forEach(function(sz){
+        out.push(HOST + set + '/photos/players/' + sz + '/' + code + '.png');
+      });
     });
     /* last resort only - see the note above about stale faces */
     out.push(HOST + 'premierleague/photos/players/110x140/p' + code + '.png');
@@ -1002,7 +1226,8 @@ var PlayerPhotos = (function(){
     urls: urls,
     element: element,
     report: report,
-    _set: SET,
+    _sets: SETS,
+    _active: function(){ return active; },
     _sizes: SIZES
   };
 })();
@@ -1183,8 +1408,9 @@ function parseH2HForm(rows){
    ===================================================================== */
 var LEAGUE = CONFIG.leagues[0];
 var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2hForm:null,
-             players:null, codes:null, bonus:null, squads:{}, byLeague:{} };
-var loaded = { home:false, league:false, h2h:false, cup:false, squads:false, players:false, portal:false };
+             players:null, codes:null, bonus:null, squads:{}, byLeague:{},
+             fixtures:[], scores:{} };
+var loaded = { home:false, league:false, h2h:false, cup:false, managers:false, players:false, portal:false };
 var route = 'home';
 
 function leagueByKey(key){
@@ -1220,7 +1446,7 @@ function useLeague(key){
   loaded.league = false;
   loaded.h2h    = false;
   loaded.cup    = false;
-  loaded.squads = false;
+  loaded.managers = false;
 
   sqTeam = null;
 
@@ -1238,7 +1464,7 @@ function redrawCurrent(){
   if (route === 'league')      renderLeague();
   else if (route === 'h2h')    renderH2H();
   else if (route === 'cup')    renderCup();
-  else if (route === 'squads') renderSquads();
+  else if (route === 'managers') { MGR.name = null; RECORD_OPEN = null; renderManagers(); }
   else if (route === 'home')   { loaded.home = false; renderHome(); }
 }
 
@@ -1251,7 +1477,7 @@ var NAV = [
   { key:'h2h',    label:'Head to Head' },
   { key:'cup',    label:'Cup' },
   { key:'super',  label:'Supercopa',    stub:true },
-  { key:'squads', label:'Squads' },
+  { key:'managers', label:'Managers' },
   { key:'players',label:'Players' },
   { key:'portal', label:'Transfer Portal' },
   { key:'honours',label:'Honours',      stub:true }
@@ -1270,14 +1496,14 @@ function buildNav(){
 function go(key){
   route = key;
   buildNav();
-  var known = ['home','league','h2h','cup','squads','players','portal'].indexOf(key) >= 0;
+  var known = ['home','league','h2h','cup','managers','players','portal'].indexOf(key) >= 0;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('on'); });
   buildLeagueBar();
   if (key === 'home')       { document.getElementById('p-home').classList.add('on'); renderHome(); }
   else if (key === 'league'){ document.getElementById('p-league').classList.add('on'); renderLeague(); }
   else if (key === 'h2h')   { document.getElementById('p-h2h').classList.add('on'); renderH2H(); }
   else if (key === 'cup')   { document.getElementById('p-cup').classList.add('on'); renderCup(); }
-  else if (key === 'squads'){ document.getElementById('p-squads').classList.add('on'); renderSquads(); }
+  else if (key === 'managers'){ document.getElementById('p-managers').classList.add('on'); renderManagers(); }
   else if (key === 'players'){ document.getElementById('p-players').classList.add('on'); renderPlayers(); }
   else if (key === 'portal'){ document.getElementById('p-portal').classList.add('on'); renderPortal(); }
   else {
@@ -1329,6 +1555,11 @@ function boot(){
      before they arrive would show the fallback greys and then flicker */
   jobs.push(fetchSheet(SHARED,'kits').then(parseKits).catch(function(){ return null; })
     .then(function(k){ DATA.kits = k; }));
+
+  /* one sheet holds every competition's fixtures, which is what makes
+     a combined record across all of them possible */
+  jobs.push(fetchSheet(SHARED,'fixtures').then(parseFixtures).catch(function(){ return []; })
+    .then(function(f){ DATA.fixtures = f; }));
 
   jobs.push(fetchSheet(SHARED,'superliga').then(parseCupGroups).catch(function(){ return null; })
     .then(function(x){ DATA.superliga = x; }));
@@ -1399,6 +1630,7 @@ function boot(){
     PlayerPhotos.build(DATA.players);
     if (DATA.players) DATA.players.forEach(function(p){ p.bonus = p.bonus || 0; });
 
+    DATA.scores = mergedScores();
     bootDone = false;
     useLeague(CONFIG.leagues[0].key);
     bootDone = true;
@@ -1717,7 +1949,7 @@ var scrubGw = 38, pinned = null, playTimer = null;
    League: the switcher lived inside the League Table page, so once
    you had changed league there was nothing anywhere else telling you
    which strand you were looking at, or letting you change back.     */
-var LEAGUE_PAGES = { home:true, league:true, h2h:true, cup:true, squads:true };
+var LEAGUE_PAGES = { home:true, league:true, h2h:true, cup:true, managers:true };
 var BOTH_LEAGUES = { super:true, honours:true, players:true, portal:true };
 
 function buildLeagueBar(){
@@ -2701,198 +2933,616 @@ function cupKnockout(host){
 /* =====================================================================
    SQUADS
    ===================================================================== */
-var sqTeam = null;
+var MGR = { name: null, view: 'squad' };
 
 /* =====================================================================
-   SQUADS
+   MANAGERS
 
-   Each manager's fifteen, in their own colours: the heading block is
-   their Main with their Text on it, the strip beneath is their Second
-   with their 4th on it. That pairing is why the 4th colour exists.
+   One page per manager, in their own kit: who they have, who they play
+   next, everything they have played, and their record against every
+   other manager whichever competition the meetings happened in.
 
-   Points in XI is what a player has actually contributed. Points Total
-   is everything they scored while in the squad, started or not. The
-   gap between the two is the bench, and it is the most interesting
-   number on the page - it is what a manager paid for and did not use.
+   The kit does the work. The header block is their Main with their
+   Text on it, the competitions panel is their Second with their 4th,
+   and the trim beneath inverts the two so it reads as kit trim rather
+   than a divider. Everything below stays white, because a fifteen row
+   table needs somewhere calm to sit.
    ===================================================================== */
 
-function renderSquads(){
-  var host = document.getElementById('p-squads');
-  if (loaded.squads) return;
-  loaded.squads = true;
-  clear(host);
-  paintSquads(host);
+var MGR_VIEWS = [['squad','Squad'],['next','Next up'],['fix','Fixtures'],
+                 ['res','Results'],['rec','Record']];
+
+function renderManagers(){
+  var host = document.getElementById('p-managers');
+  if (loaded.managers) return;
+  loaded.managers = true;
+  paintManagers(host);
 }
 
-function paintSquads(host){
+function paintManagers(host){
   clear(host);
 
   var data = (DATA.byLeague[LEAGUE.key] || {}).squads;
+  var names = data && data.summary.length
+    ? data.summary.map(function(m){ return m.name; })
+    : ((DATA.table || []).map(function(t){ return t.name; }));
 
-  if (!data || !data.summary.length){
+  if (!names.length){
     var note = el('div','note');
     note.style.margin = '28px 24px';
-    note.textContent = 'No squads yet. They appear once the draft has happened, '
-      + 'or once FPL starts reporting ownership.';
+    note.textContent = 'No managers yet. They appear once the raw pull has run.';
     host.appendChild(note);
     return;
   }
 
-  /* pick a manager - defaults to whoever is top on points in the XI */
-  var names = data.summary.map(function(m){ return m.name; });
-  if (!sqTeam || names.indexOf(sqTeam) < 0) sqTeam = names[0];
+  if (!MGR.name || names.indexOf(MGR.name) < 0) MGR.name = names[0];
+  var kit = kitFor(MGR.name);
+  var sum = data && data.byManager[MGR.name] ? data.byManager[MGR.name].summary : null;
 
-  /* ---- the manager strip ---- */
-  var strip = el('div');
-  strip.style.cssText = 'display:flex;gap:6px;overflow-x:auto;padding:16px 24px 8px';
+  host.appendChild(mgrPicker(names, host));
+  host.appendChild(mgrHeader(kit, sum));
+  host.appendChild(mgrTabs(kit, host));
+  host.appendChild(mgrTiles(kit, sum));
 
-  data.summary.forEach(function(m){
-    var k = kitFor(m.name);
-    var on = m.name === sqTeam;
+  var body = el('div');
+  body.style.cssText = 'padding:2px 24px 36px';
+  host.appendChild(body);
 
-    var b = el('button');
-    b.style.cssText = 'flex:0 0 auto;border:none;cursor:pointer;padding:9px 13px;'
-      + 'border-radius:3px;font:inherit;font-size:12px;font-weight:700;text-align:left;'
-      + 'line-height:1.25;min-width:96px;'
-      + 'background:' + k.main + ';color:' + k.text + ';'
-      + 'outline:' + (on ? '2px solid #141414' : '2px solid transparent') + ';'
-      + 'outline-offset:1px;opacity:' + (on ? '1' : '.72');
-    b.innerHTML = '<div>' + escapeHtml(m.name) + '</div>'
-      + '<div style="font-size:10px;font-weight:600;opacity:.85;margin-top:2px">'
-      + m.xiPts + ' pts</div>';
-    b.addEventListener('click', function(){ sqTeam = m.name; paintSquads(host); });
-    strip.appendChild(b);
+  if (MGR.view === 'squad')      mgrSquad(body, data);
+  else if (MGR.view === 'next')  mgrNext(body);
+  else if (MGR.view === 'fix')   mgrList(body, false);
+  else if (MGR.view === 'res')   mgrList(body, true);
+  else                           mgrRecord(body);
+}
+
+/* ---- the picker: a row of names, not a dropdown ---- */
+function mgrPicker(names, host){
+  var bar = el('div');
+  bar.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap;'
+    + 'padding:14px 24px 10px';
+
+  var lbl = el('span', null, 'MANAGER');
+  lbl.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:1.2px;'
+    + 'color:#8a939c;margin-right:2px';
+  bar.appendChild(lbl);
+
+  names.forEach(function(n){
+    var k = kitFor(n);
+    var on = n === MGR.name;
+    var b = el('button', null, n);
+    b.style.cssText = 'font:inherit;font-size:12px;font-weight:' + (on ? '800' : '600')
+      + ';cursor:pointer;padding:6px 11px;border-radius:3px;border:1px solid '
+      + (on ? 'transparent' : '#dbe2e9') + ';'
+      + (on ? 'background:' + k.main + ';color:' + k.text : 'background:#fff;color:#5a6570');
+    b.addEventListener('click', function(){
+      if (n === MGR.name) return;
+      MGR.name = n;
+      paintManagers(host);
+    });
+    bar.appendChild(b);
   });
-  host.appendChild(strip);
+  return bar;
+}
 
-  var mine = data.byManager[sqTeam];
-  if (!mine) return;
-  var sum = mine.summary || {};
-  var kit = kitFor(sqTeam);
+/* ---- kit header, competitions panel, inverted trim ---- */
+function mgrHeader(kit, sum){
+  var wrap = el('div');
+  wrap.style.cssText = 'margin:0 24px';
 
-  /* ---- header block: Main with Text on it ---- */
-  var head = el('div');
-  head.style.cssText = 'margin:12px 24px 0;padding:18px 20px 16px;border-radius:3px 3px 0 0;'
-    + 'background:' + kit.main + ';color:' + kit.text;
+  var top = el('div');
+  top.style.cssText = 'display:flex;flex-wrap:wrap';
 
-  var h = el('div');
-  h.style.cssText = 'font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.1';
-  h.textContent = sqTeam;
-  head.appendChild(h);
+  var left = el('div');
+  left.style.cssText = 'flex:1;min-width:260px;background:' + kit.main + ';color:' + kit.text
+    + ';padding:18px 20px;display:flex;align-items:center;gap:14px';
 
-  if (sum.real){
-    var sub = el('div');
-    sub.style.cssText = 'font-size:12px;font-weight:600;opacity:.85;margin-top:3px';
-    sub.textContent = sum.real + (kit.kit ? '  \u00b7  ' + kit.kit : '');
-    head.appendChild(sub);
+  var av = el('div');
+  av.style.cssText = 'width:60px;height:60px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+    + 'background:rgba(255,255,255,.3);border:2px solid ' + kit.second
+    + ';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800';
+  av.appendChild(imgTry(CONFIG.img.manager(MGR.name), function(){
+    av.textContent = MGR.name.substring(0,2).toUpperCase();
+  }));
+  var im = av.firstChild;
+  if (im && im.style) im.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  left.appendChild(av);
+
+  var who = el('div');
+  who.style.minWidth = '0';
+  var nm = el('div', null, MGR.name);
+  nm.style.cssText = 'font-size:28px;font-weight:800;letter-spacing:-.8px;line-height:1.05';
+  who.appendChild(nm);
+  if (sum && sum.real){
+    var rl = el('div', null, sum.real + (kit.kit ? '  \u00b7  ' + kit.kit : ''));
+    rl.style.cssText = 'font-size:12px;font-weight:600;opacity:.82;margin-top:2px';
+    who.appendChild(rl);
   }
+  left.appendChild(who);
+  top.appendChild(left);
+
+  var right = el('div');
+  right.style.cssText = 'width:236px;flex-shrink:0;background:' + kit.second + ';color:'
+    + kit.fourth + ';padding:15px 16px';
+  var ch = el('div', null, 'COMPETITIONS');
+  ch.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:1.2px;opacity:.72;margin-bottom:9px';
+  right.appendChild(ch);
+
+  var grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px 10px';
+  mgrCompStandings().forEach(function(c){
+    var d = el('div');
+    d.style.cssText = 'border-left:2px solid ' + kit.fourth + ';padding-left:8px;opacity:.95';
+    var t = el('div', null, c[0]);
+    t.style.cssText = 'font-size:9px;font-weight:600;opacity:.75;white-space:nowrap;'
+      + 'overflow:hidden;text-overflow:ellipsis';
+    var v = el('div', null, c[1]);
+    v.style.cssText = 'font-size:15px;font-weight:800;letter-spacing:-.3px;margin-top:1px';
+    d.appendChild(t); d.appendChild(v);
+    grid.appendChild(d);
+  });
+  right.appendChild(grid);
+  top.appendChild(right);
+  wrap.appendChild(top);
+
+  /* the trim inverts the header above it */
+  var trim = el('div');
+  trim.style.cssText = 'display:flex;height:5px';
+  var t1 = el('span'); t1.style.cssText = 'flex:1;background:' + kit.second;
+  var t2 = el('span'); t2.style.cssText = 'width:236px;background:' + kit.main;
+  trim.appendChild(t1); trim.appendChild(t2);
+  wrap.appendChild(trim);
+
+  return wrap;
+}
+
+/* Where they stand in each competition. The Copa is a status, not a
+   position - nobody has a fixture in it until two managers do.     */
+function mgrCompStandings(){
+  var out = [];
+  var lt = (DATA.table || []).filter(function(t){ return t.name === MGR.name; })[0];
+  out.push(['Overall league', lt ? ordinal(lt.pos) : '\u2013']);
+
+  var h = DATA.h2h && DATA.h2h.table
+    ? DATA.h2h.table.filter(function(t){ return t.name === MGR.name; })[0] : null;
+  out.push(['Head to Head', h ? ordinal(h.pos) : '\u2013']);
+
+  var cupPos = null;
+  if (DATA.cup){
+    ['a','b'].forEach(function(g){
+      (DATA.cup[g] || []).forEach(function(t, i){
+        if (t.name === MGR.name) cupPos = ordinal(i+1) + ' ' + g.toUpperCase();
+      });
+    });
+  }
+  out.push([LEAGUE.cupName || 'Cup', cupPos || '\u2013']);
+
+  var sl = DATA.superliga && DATA.superliga.groups
+    ? flatFind(DATA.superliga, MGR.name) : null;
+  out.push(['SuperLiga', sl ? ordinal(sl.pos) : '\u2013']);
+
+  return out;
+}
+
+function flatFind(g, name){
+  var hit = null;
+  Object.keys(g.groups || {}).forEach(function(k){
+    (g.groups[k] || []).forEach(function(t, i){
+      if (t.name === name && !hit) hit = { pos: i+1, group: k };
+    });
+  });
+  return hit;
+}
+
+/* ---- sub-tabs ---- */
+function mgrTabs(kit, host){
+  var bar = el('div');
+  bar.style.cssText = 'margin:0 24px;display:flex;gap:2px;overflow-x:auto;'
+    + 'border-bottom:1px solid #e3e8ee;background:#fff';
+  MGR_VIEWS.forEach(function(v){
+    var on = MGR.view === v[0];
+    var b = el('button', null, v[1]);
+    b.style.cssText = 'font:inherit;font-size:12px;font-weight:' + (on ? '800' : '600')
+      + ';cursor:pointer;background:none;border:none;white-space:nowrap;padding:12px 14px;'
+      + 'color:' + (on ? kit.second : '#5a6570') + ';'
+      + 'border-bottom:3px solid ' + (on ? kit.second : 'transparent');
+    b.addEventListener('click', function(){
+      if (MGR.view === v[0]) return;
+      MGR.view = v[0];
+      paintManagers(host);
+    });
+    bar.appendChild(b);
+  });
+  return bar;
+}
+
+/* ---- five tiles, alternating main and second ---- */
+function mgrTiles(kit, sum){
+  var fx = managerFixtures(MGR.name).filter(function(f){ return f.played; });
+  var best = 0, total = 0;
+  var sc = DATA.scores[MGR.name] || {};
+  var weeks = Object.keys(sc);
+  weeks.forEach(function(g){ var v = num(sc[g]); total += v; if (v > best) best = v; });
+  var avg = weeks.length ? Math.round(total / weeks.length) : 0;
+  var spend = sum && sum.spent !== null && sum.spent !== undefined ? sum.spent : null;
+
+  var vals = [
+    [String(total), 'POINTS'],
+    [String(best), 'BEST GW'],
+    [String(avg), 'AVERAGE'],
+    [spend === null ? '\u2013' : spend.toFixed(1) + 'm', 'SPEND'],
+    [spend ? (total / spend).toFixed(1) : '\u2013', 'PTS PER \u00a3M']
+  ];
+
+  var g = el('div');
+  g.style.cssText = 'margin:14px 24px 10px;display:grid;'
+    + 'grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px';
+  vals.forEach(function(v, i){
+    var odd = i % 2 === 1;
+    var d = el('div');
+    d.style.cssText = 'padding:11px 12px;background:' + (odd ? kit.second : kit.main)
+      + ';color:' + (odd ? kit.fourth : kit.text);
+    var b = el('div', null, v[0]);
+    b.style.cssText = 'font-size:19px;font-weight:800;letter-spacing:-.6px';
+    var l = el('div', null, v[1]);
+    l.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:1px;opacity:.78;margin-top:3px';
+    d.appendChild(b); d.appendChild(l);
+    g.appendChild(d);
+  });
+  return g;
+}
+
+/* ---- SQUAD ---- */
+function mgrSquad(host, data){
+  var mine = data && data.byManager[MGR.name];
+  if (!mine || !mine.players.length){
+    host.appendChild(note_('No squad yet. It appears once the draft has happened, '
+      + 'or once FPL starts reporting ownership.'));
+    return;
+  }
+
+  var kit = kitFor(MGR.name);
+  var hasFees = mine.players.some(function(p){ return p.fee !== null; });
+  var order = ['GK','DEF','MID','FWD'];
+  var limits = { GK:2, DEF:5, MID:5, FWD:3 };
+
+  order.forEach(function(pos){
+    var group = mine.players.filter(function(p){ return p.pos === pos; });
+    if (!group.length) return;
+
+    var head = el('div');
+    head.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 4px';
+    var pl = el('span', null, pos);
+    pl.style.cssText = 'font-size:10px;font-weight:800;letter-spacing:1.3px;color:' + kit.second;
+    var ct = el('span', null, group.length + ' of ' + (limits[pos] || group.length));
+    ct.style.cssText = 'font-size:10px;font-weight:600;color:#8a939c';
+    var ln = el('span');
+    ln.style.cssText = 'flex:1;height:1px;background:#e8ecf0';
+    head.appendChild(pl); head.appendChild(ct); head.appendChild(ln);
+    host.appendChild(head);
+
+    group.forEach(function(p){
+      var row = el('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 0;'
+        + 'border-bottom:0.5px solid #f2f4f7' + (p.starts ? '' : ';opacity:.55');
+
+      var ph = playerPhoto(null, p.name, 26);
+      ph.style.flexShrink = '0';
+      row.appendChild(ph);
+
+      row.appendChild(cell_(p.name, 'flex:1;font-size:13px;font-weight:700;color:#0C2340'));
+      row.appendChild(cell_(p.club, 'width:38px;font-size:10px;font-weight:600;color:#8a939c'));
+      if (hasFees) row.appendChild(cell_(p.fee === null ? '' : p.fee.toFixed(1) + 'm',
+        'width:46px;font-size:11px;color:#8a939c;text-align:right'));
+      row.appendChild(cell_(String(p.starts),
+        'width:34px;font-size:11px;color:#8a939c;text-align:right'));
+      row.appendChild(cell_(String(p.xiPts),
+        'width:44px;font-size:15px;font-weight:800;color:#0C2340;text-align:right'));
+      row.appendChild(cell_(String(p.totalPts),
+        'width:40px;font-size:11px;color:#a3adb7;text-align:right'));
+      row.appendChild(cell_(p.starts ? p.ppg.toFixed(1) : '\u2013',
+        'width:34px;font-size:11px;color:#8a939c;text-align:right'));
+      host.appendChild(row);
+    });
+  });
+}
+
+/* ---- NEXT UP ---- */
+function mgrNext(host){
+  var fx = managerFixtures(MGR.name).filter(function(f){ return !f.played && f.oppReal; });
+
+  /* the soonest fixture in each competition */
+  var seen = {}, next = [];
+  fx.forEach(function(f){
+    if (seen[f.comp]) return;
+    seen[f.comp] = true;
+    next.push(f);
+  });
+
+  if (!next.length){
+    host.appendChild(note_('No fixtures to come. Either the season has finished, '
+      + 'or the fixtures have not been generated yet.'));
+    return;
+  }
+
+  next.forEach(function(f){
+    var oc = opponentColour(MGR.name, f.opp);
+    var rec = recordAgainst(f.opp, f.comp);
+    var mePos = positionIn(f.comp, MGR.name);
+    var opPos = positionIn(f.comp, f.opp);
+
+    var card = el('div');
+    card.style.cssText = 'display:flex;background:' + oc.bg + ';color:' + oc.fg
+      + ';margin-bottom:8px;border-radius:3px;overflow:hidden;min-height:92px';
+
+    var pic = el('div');
+    pic.style.cssText = 'width:96px;flex-shrink:0;background:rgba(255,255,255,.12);'
+      + 'display:flex;align-items:flex-end;justify-content:center';
+    var av = el('div');
+    av.style.cssText = 'width:62px;height:62px;border-radius:50%;overflow:hidden;'
+      + 'background:rgba(255,255,255,.22);margin-bottom:8px;display:flex;'
+      + 'align-items:center;justify-content:center;font-size:16px;font-weight:800';
+    av.appendChild(imgTry(CONFIG.img.manager(f.opp), function(){
+      av.textContent = f.opp.substring(0,2).toUpperCase();
+    }));
+    var oi = av.firstChild;
+    if (oi && oi.style) oi.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    pic.appendChild(av);
+    card.appendChild(pic);
+
+    var body = el('div');
+    body.style.cssText = 'flex:1;padding:13px 18px;min-width:0';
+
+    var top = el('div');
+    top.style.cssText = 'display:flex;align-items:baseline;gap:9px;flex-wrap:wrap';
+    top.appendChild(cell_(f.comp.toUpperCase(),
+      'font-size:10px;font-weight:800;letter-spacing:1.3px;opacity:.9'));
+    if (f.stage) top.appendChild(cell_(f.stage,
+      'font-size:10px;font-weight:600;opacity:.7'));
+    top.appendChild(cell_('GW' + f.gw + '  \u00b7  ' + (f.home ? 'Home' : 'Away'),
+      'font-size:10px;font-weight:700;opacity:.7;margin-left:auto'));
+    body.appendChild(top);
+
+    body.appendChild(cell_('v ' + f.opp,
+      'font-size:26px;font-weight:800;letter-spacing:-.7px;line-height:1.1;margin:5px 0 8px'));
+
+    var foot = el('div');
+    foot.style.cssText = 'display:flex;gap:22px;font-size:11px;flex-wrap:wrap';
+    foot.appendChild(cell_(MGR.name + '   ' + (mePos ? ordinal(mePos.pos) : '\u2013')
+      + '   ' + (mePos ? mePos.w + '-' + mePos.d + '-' + mePos.l : ''), 'opacity:.85'));
+    foot.appendChild(cell_(f.opp + '   ' + (opPos ? ordinal(opPos.pos) : '\u2013')
+      + '   ' + (opPos ? opPos.w + '-' + opPos.d + '-' + opPos.l : ''), 'opacity:.85'));
+    if (rec.p) foot.appendChild(cell_('Record ' + rec.w + '-' + rec.d + '-' + rec.l,
+      'opacity:.7;margin-left:auto'));
+    body.appendChild(foot);
+
+    card.appendChild(body);
+    host.appendChild(card);
+  });
+}
+
+function recordAgainst(opp, comp){
+  var r = { p:0, w:0, d:0, l:0 };
+  managerFixtures(MGR.name).forEach(function(f){
+    if (f.opp !== opp || !f.played) return;
+    if (comp && f.comp !== comp) return;
+    r.p++;
+    if (f.result === 'W') r.w++; else if (f.result === 'L') r.l++; else r.d++;
+  });
+  return r;
+}
+
+/* ---- FIXTURES and RESULTS, same list, different half ---- */
+function mgrList(host, played){
+  var fx = managerFixtures(MGR.name).filter(function(f){
+    return f.oppReal && (played ? f.played : !f.played);
+  });
+
+  if (!fx.length){
+    host.appendChild(note_(played
+      ? 'Nothing played yet.'
+      : 'No fixtures to come.'));
+    return;
+  }
+
+  var head = el('div');
+  head.style.cssText = 'display:flex;gap:8px;padding:10px 0 6px;border-bottom:0.5px solid #e3e8ee;'
+    + 'font-size:9px;font-weight:700;letter-spacing:.9px;color:#8a939c';
+  [['GW','width:44px'],['COMPETITION','flex:1'],['ROUND','width:110px'],
+   ['OPPONENT','width:104px'],['H/A','width:34px'],
+   [played ? 'SCORE' : '', 'width:70px;text-align:right'],
+   ['','width:22px']].forEach(function(c){
+    head.appendChild(cell_(c[0], c[1]));
+  });
   host.appendChild(head);
 
-  /* ---- stat strip: Second with 4th on it ---- */
-  var bar = el('div');
-  bar.style.cssText = 'margin:0 24px;padding:11px 20px;display:flex;gap:26px;flex-wrap:wrap;'
-    + 'background:' + kit.second + ';color:' + kit.fourth;
+  fx.forEach(function(f){
+    var oc = opponentColour(MGR.name, f.opp);
+    var row = el('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:7px 0;'
+      + 'border-bottom:0.5px solid #f2f4f7';
+    row.appendChild(cell_('GW' + f.gw, 'width:44px;font-size:11px;color:#8a939c'));
+    row.appendChild(cell_(f.comp, 'flex:1;font-size:12px;color:#0C2340'));
+    row.appendChild(cell_(f.stage || '', 'width:110px;font-size:11px;color:#8a939c'));
+    row.appendChild(cell_(f.opp, 'width:104px;font-size:12px;font-weight:700;color:#0C2340'));
+    row.appendChild(cell_(f.home ? 'H' : 'A', 'width:34px;font-size:11px;color:#8a939c'));
+    row.appendChild(cell_(f.played ? f.mine + ' - ' + f.theirs : '',
+      'width:70px;font-size:12px;text-align:right;color:#5a6570'));
 
-  function stat(label, value){
-    var d = el('div');
-    d.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;'
-      + 'text-transform:uppercase;opacity:.75">' + escapeHtml(label) + '</div>'
-      + '<div style="font-size:16px;font-weight:800;margin-top:1px;'
-      + 'font-variant-numeric:tabular-nums">' + escapeHtml(String(value)) + '</div>';
-    bar.appendChild(d);
-  }
-
-  stat('Players', sum.count);
-  if (sum.spent !== null && sum.spent !== undefined){
-    stat('Spent', sum.spent.toFixed(1) + 'm');
-    stat('Budget left', sum.remaining.toFixed(1) + 'm');
-  }
-  stat('Points in XI', sum.xiPts);
-  stat('Squad points', sum.squadPts);
-  stat('On the bench', sum.squadPts - sum.xiPts);
-  host.appendChild(bar);
-
-  /* ---- the fifteen ---- */
-  var wrap = el('div');
-  wrap.style.cssText = 'margin:0 24px 34px;background:#fff;border:1px solid #e3e8ee;'
-    + 'border-top:none;border-radius:0 0 3px 3px;overflow-x:auto';
-
-  var t = el('table');
-  t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px';
-
-  var hasFees = mine.players.some(function(p){ return p.fee !== null; });
-
-  var cols = ['Player','Pos','Club'];
-  if (hasFees) cols.push('Fee');
-  cols = cols.concat(['Starts','Pts in XI','Pts total','PPG']);
-
-  var thead = el('thead'), htr = el('tr');
-  cols.forEach(function(c, i){
-    var th = el('th', null, c);
-    th.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.09em;'
-      + 'text-transform:uppercase;color:#8a939c;padding:9px 12px;'
-      + 'border-bottom:1px solid #e3e8ee;white-space:nowrap;text-align:'
-      + (i < 3 ? 'left' : 'right');
-    htr.appendChild(th);
+    var mark = el('span');
+    var kit = kitFor(MGR.name);
+    mark.style.cssText = 'width:22px;display:flex;justify-content:flex-end';
+    if (f.played){
+      var blk = el('span');
+      blk.style.cssText = 'width:9px;height:16px;background:'
+        + (f.result === 'W' ? kit.main : f.result === 'L' ? oc.bg : '#B4B2A9');
+      mark.appendChild(blk);
+    }
+    row.appendChild(mark);
+    host.appendChild(row);
   });
-  thead.appendChild(htr); t.appendChild(thead);
+}
 
-  var tb = el('tbody');
-  var lastPos = null;
+/* ---- RECORD ---- */
+var RECORD_OPEN = null;
 
-  mine.players.forEach(function(p){
-    var tr = el('tr');
-    /* a faint rule where the position changes, so the shape of the
-       squad reads at a glance without a heading row per group */
-    var newBlock = lastPos !== null && p.pos !== lastPos;
-    lastPos = p.pos;
+function mgrRecord(host){
+  var rec = managerRecord(MGR.name);
+  if (!rec.length){
+    host.appendChild(note_('No meetings yet. The record fills in as fixtures are played.'));
+    return;
+  }
 
-    var cells = [
-      ['<b>' + escapeHtml(p.name) + '</b>', 'l'],
-      [posPill(p.pos), 'l'],
-      [escapeHtml(p.club), 'l']
-    ];
-    if (hasFees) cells.push([p.fee === null ? '' : p.fee.toFixed(1) + 'm', 'r']);
-    cells.push(
-      [String(p.starts), 'r'],
-      ['<b>' + p.xiPts + '</b>', 'r'],
-      [String(p.totalPts), 'r'],
-      [p.starts ? p.ppg.toFixed(1) : '-', 'r']
-    );
+  var head = el('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 0 6px;'
+    + 'border-bottom:0.5px solid #e3e8ee;font-size:9px;font-weight:700;'
+    + 'letter-spacing:.9px;color:#8a939c';
+  [['','width:3px'],['','width:26px'],['OPPONENT','flex:1'],
+   ['P','width:26px;text-align:right'],['W','width:24px;text-align:right'],
+   ['D','width:24px;text-align:right'],['L','width:24px;text-align:right'],
+   ['FOR','width:42px;text-align:right'],['AGST','width:42px;text-align:right'],
+   ['DIFF','width:40px;text-align:right']].forEach(function(c){
+    head.appendChild(cell_(c[0], c[1]));
+  });
+  host.appendChild(head);
 
-    cells.forEach(function(c){
-      var td = el('td');
-      td.innerHTML = c[0];
-      td.style.cssText = 'padding:8px 12px;border-bottom:1px solid #f1f4f7;'
-        + 'text-align:' + (c[1] === 'l' ? 'left' : 'right')
-        + ';white-space:nowrap;font-variant-numeric:tabular-nums;'
-        + (newBlock ? 'border-top:1px solid #e3e8ee;' : '');
-      tr.appendChild(td);
+  rec.forEach(function(r){
+    var oc = opponentColour(MGR.name, r.opp);
+    var diff = r.f - r.a;
+
+    var row = el('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;'
+      + 'border-bottom:0.5px solid #f2f4f7;cursor:pointer';
+
+    var bar = el('span');
+    bar.style.cssText = 'width:3px;height:22px;background:' + oc.bg;
+    row.appendChild(bar);
+
+    var av = el('span');
+    av.style.cssText = 'width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+      + 'background:' + oc.bg + ';color:' + oc.fg + ';display:flex;align-items:center;'
+      + 'justify-content:center;font-size:9px;font-weight:800';
+    av.appendChild(imgTry(CONFIG.img.manager(r.opp), function(){
+      av.textContent = r.opp.substring(0,2).toUpperCase();
+    }));
+    var ai = av.firstChild;
+    if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    row.appendChild(av);
+
+    row.appendChild(cell_(r.opp, 'flex:1;font-size:13px;font-weight:700;color:#0C2340'));
+    row.appendChild(cell_(String(r.p), 'width:26px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(r.w), 'width:24px;text-align:right;font-size:12px;font-weight:800;color:#0C2340'));
+    row.appendChild(cell_(String(r.d), 'width:24px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(r.l), 'width:24px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(r.f), 'width:42px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_(String(r.a), 'width:42px;text-align:right;font-size:12px;color:#5a6570'));
+    row.appendChild(cell_((diff > 0 ? '+' : '') + diff,
+      'width:40px;text-align:right;font-size:12px;font-weight:800;color:'
+      + (diff > 0 ? '#2d7a2d' : diff < 0 ? '#c0392b' : '#5a6570')));
+
+    row.addEventListener('click', function(){
+      RECORD_OPEN = RECORD_OPEN === r.opp ? null : r.opp;
+      paintManagers(document.getElementById('p-managers'));
     });
+    host.appendChild(row);
 
-    /* a player who has never made the eleven is dimmed - money sitting
-       on the bench is the thing worth noticing */
-    if (!p.starts) tr.style.opacity = '.55';
-    tb.appendChild(tr);
+    if (RECORD_OPEN === r.opp) host.appendChild(recordCard(r, oc));
+  });
+}
+
+function recordCard(r, oc){
+  var kit = kitFor(MGR.name);
+  var card = el('div');
+  card.style.cssText = 'margin:9px 0 12px;border:0.5px solid #e3e8ee;border-radius:3px;'
+    + 'overflow:hidden;background:#fff';
+
+  var head = el('div');
+  head.style.cssText = 'background:' + oc.bg + ';color:' + oc.fg
+    + ';padding:12px 15px;display:flex;align-items:center;gap:11px';
+  var av = el('span');
+  av.style.cssText = 'width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+    + 'background:rgba(255,255,255,.22);display:flex;align-items:center;'
+    + 'justify-content:center;font-size:11px;font-weight:800';
+  av.appendChild(imgTry(CONFIG.img.manager(r.opp), function(){
+    av.textContent = r.opp.substring(0,2).toUpperCase();
+  }));
+  var hi = av.firstChild;
+  if (hi && hi.style) hi.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  head.appendChild(av);
+
+  var comps = {};
+  r.fx.forEach(function(f){ comps[f.comp] = true; });
+  var t = el('div');
+  t.appendChild(cell_(MGR.name + ' v ' + r.opp,
+    'display:block;font-size:17px;font-weight:800;letter-spacing:-.4px;line-height:1.1'));
+  t.appendChild(cell_(r.p + ' meeting' + (r.p === 1 ? '' : 's') + ' across '
+    + Object.keys(comps).length + ' competition' + (Object.keys(comps).length === 1 ? '' : 's'),
+    'display:block;font-size:10px;font-weight:600;opacity:.82;margin-top:1px'));
+  head.appendChild(t);
+  card.appendChild(head);
+
+  /* the bar: my colour for my wins, grey for draws, theirs for theirs */
+  var bar = el('div');
+  bar.style.cssText = 'display:flex;height:34px';
+  [[r.w, kit.main, kit.text], [r.d, '#B4B2A9', '#2C2C2A'], [r.l, oc.bg, oc.fg]]
+    .forEach(function(seg){
+      if (!seg[0]) return;
+      var sp = el('span', null, String(seg[0]));
+      sp.style.cssText = 'width:' + (seg[0] / r.p * 100) + '%;background:' + seg[1]
+        + ';color:' + seg[2] + ';display:flex;align-items:center;justify-content:center;'
+        + 'font-size:14px;font-weight:800';
+      bar.appendChild(sp);
+    });
+  card.appendChild(bar);
+
+  var lbl = el('div');
+  lbl.style.cssText = 'display:flex;justify-content:space-between;padding:4px 15px 9px;'
+    + 'font-size:8px;font-weight:800;letter-spacing:1.1px;color:#8a939c';
+  lbl.appendChild(cell_(MGR.name.toUpperCase() + ' WINS'));
+  lbl.appendChild(cell_('DRAWN'));
+  lbl.appendChild(cell_(r.opp.toUpperCase() + ' WINS'
+    + (oc.using === 'main' ? '' : '  \u00b7  ' + oc.using.toUpperCase())));
+  card.appendChild(lbl);
+
+  var fh = el('div');
+  fh.style.cssText = 'display:flex;gap:8px;padding:8px 15px 5px;border-top:0.5px solid #e3e8ee;'
+    + 'font-size:9px;font-weight:700;letter-spacing:.8px;color:#8a939c';
+  [['COMPETITION','flex:1'],['ROUND','width:96px'],['GW','width:44px'],
+   ['SCORE','width:64px;text-align:right'],['','width:22px']].forEach(function(c){
+    fh.appendChild(cell_(c[0], c[1]));
+  });
+  card.appendChild(fh);
+
+  r.fx.forEach(function(f){
+    var row = el('div');
+    row.style.cssText = 'display:flex;gap:8px;padding:6px 15px;font-size:12px;'
+      + 'align-items:center;border-top:0.5px solid #f2f4f7';
+    row.appendChild(cell_(f.comp, 'flex:1;color:#0C2340'));
+    row.appendChild(cell_(f.stage || '', 'width:96px;font-size:11px;color:#8a939c'));
+    row.appendChild(cell_('GW' + f.gw, 'width:44px;font-size:11px;color:#8a939c'));
+    row.appendChild(cell_(f.mine + ' - ' + f.theirs, 'width:64px;text-align:right;color:#5a6570'));
+    var mk = el('span');
+    mk.style.cssText = 'width:22px;display:flex;justify-content:flex-end';
+    var blk = el('span');
+    blk.style.cssText = 'width:9px;height:16px;background:'
+      + (f.result === 'W' ? kit.main : f.result === 'L' ? oc.bg : '#B4B2A9');
+    mk.appendChild(blk);
+    row.appendChild(mk);
+    card.appendChild(row);
   });
 
-  t.appendChild(tb);
-  wrap.appendChild(t);
-  host.appendChild(wrap);
+  return card;
 }
 
-function posPill(pos){
-  var c = { GK:['#eef6ff','#1d4ed8'], DEF:['#effaf1','#15803d'],
-            MID:['#fffbeb','#a16207'], FWD:['#fff1f3','#be123c'] }[pos]
-        || ['#f1f4f7','#5a636c'];
-  return '<span style="display:inline-block;padding:2px 7px;border-radius:2px;'
-    + 'font-size:10px;font-weight:700;background:' + c[0] + ';color:' + c[1] + '">'
-    + escapeHtml(pos) + '</span>';
+function cell_(text, css){
+  var sp = el('span', null, text === undefined ? '' : text);
+  if (css) sp.style.cssText = css;
+  return sp;
 }
 
-function escapeHtml(v){
-  return String(v == null ? '' : v)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function note_(text){
+  var n = el('div','note', text);
+  n.style.cssText = 'margin:24px 0;font-size:13px;color:#5a6570';
+  return n;
 }
 
 /* =====================================================================
