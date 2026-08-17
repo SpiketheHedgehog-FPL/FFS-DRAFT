@@ -796,31 +796,215 @@ function parsePhotoCodes(rows){
   return { byId: byId, byName: byName };
 }
 
-function playerPhotoUrl(id, nm){
-  if (!DATA.codes) return null;
-  var code = id ? DATA.codes.byId[String(id).trim()] : null;
-  if (!code && nm){
-    var nl = String(nm).toLowerCase().trim();
-    var parts = nl.split(' ');
-    code = DATA.codes.byName[nl] || DATA.codes.byName[parts[parts.length-1]] || null;
+/* =====================================================================
+   PLAYER PHOTOS
+   One place that decides which face belongs to which player, so no
+   page has to work it out for itself.
+
+   THE BUG THIS EXISTS TO KILL
+   A player's photo is keyed on their FPL "code", which is a permanent
+   six-digit number, and NOT on their element id. The two are easy to
+   confuse and both are numbers, so using the wrong one gives you a
+   perfectly valid photo of completely the wrong player.
+
+   Worse was the old fallback: if the id missed, it looked the player
+   up by name, and then by the LAST WORD of their name. Premier League
+   squads are full of shared surnames - the Silvas, the Sanchezes, the
+   Gomeses - so whichever one happened to be read last silently won,
+   and the other wore his face all season.
+
+   So the rules here are:
+
+     1. The element id is the only key trusted outright.
+     2. A name is used only if it belongs to exactly ONE player in the
+        pool. Any name shared by two or more is thrown away entirely.
+     3. No photo is better than the wrong photo. A player we cannot
+        resolve with confidence gets their initials.
+
+   Rule 3 is the whole point. A missing face reads as missing data. A
+   wrong face reads as a working site that is quietly lying.
+   ===================================================================== */
+
+var PlayerPhotos = (function(){
+
+  var byId = {};          /* element id  -> code   the trusted key   */
+  var byName = {};        /* unique name -> code   only if unshared  */
+  var dropped = {};       /* names thrown away, and how many shared  */
+  var built = false;
+
+  /* Sizes are tried in turn. Not every player has every size on the
+     Premier League's servers, and a missing one 404s rather than
+     redirecting, so trying more than one is the difference between a
+     face and a set of initials.                                     */
+  var SIZES = ['250x250', '110x140', '40x40'];
+  var BASE  = 'https://resources.premierleague.com/premierleague/photos/players/';
+
+  function reset(){
+    byId = {}; byName = {}; dropped = {}; built = false;
   }
-  if (!code) return null;
-  return 'https://resources.premierleague.com/premierleague/photos/players/110x140/p' + code + '.png';
+
+  /* Build the indexes from the Transfer Player List, which carries an
+     ID column and a Code column for all 587.                        */
+  function build(players){
+    reset();
+    if (!players || !players.length) return;
+
+    var nameCount = {};
+
+    players.forEach(function(p){
+      var code = clean(p.code);
+      var id   = clean(p.id);
+      if (!code) return;
+
+      if (id) byId[id] = code;
+
+      /* count every name form before trusting any of them */
+      names(p).forEach(function(n){
+        if (!nameCount[n]) nameCount[n] = {};
+        nameCount[n][code] = true;
+      });
+    });
+
+    /* a name is only usable if every player answering to it is the
+       same player */
+    Object.keys(nameCount).forEach(function(n){
+      var codes = Object.keys(nameCount[n]);
+      if (codes.length === 1) byName[n] = codes[0];
+      else dropped[n] = codes.length;
+    });
+
+    built = true;
+  }
+
+  function clean(v){
+    var t = String(v == null ? '' : v).trim();
+    return /^\d+$/.test(t) ? t : '';
+  }
+
+  function key(v){
+    return String(v == null ? '' : v).toLowerCase().trim().replace(/\s+/g,' ');
+  }
+
+  /* The forms a player might be referred to by elsewhere on the site.
+     Deliberately does NOT include the surname on its own - that is
+     the form that collides, and the counting above would drop most of
+     them anyway, but there is no reason to invite it.               */
+  function names(p){
+    var out = [];
+    if (p.web) out.push(key(p.web));
+    if (p.first && p.sec) out.push(key(p.first + ' ' + p.sec));
+    if (p.name) out.push(key(p.name));
+    return out.filter(function(n){ return n.length > 1; });
+  }
+
+  /* The code for a player, or '' if we are not sure.                */
+  function codeFor(id, name){
+    if (!built) return '';
+
+    var byid = byId[clean(id)];
+    if (byid) return byid;
+
+    var n = key(name);
+    if (n && byName[n]) return byName[n];
+
+    return '';
+  }
+
+  function urls(code){
+    return SIZES.map(function(sz){ return BASE + sz + '/p' + code + '.png'; });
+  }
+
+  /* An <img> that walks the sizes, then gives up quietly.           */
+  function imgFor(code, onGone){
+    var list = urls(code);
+    var im = document.createElement('img');
+    var i = 0, done = false;
+    im.alt = '';
+    im.addEventListener('error', function(){
+      if (done) return;
+      i++;
+      if (i < list.length) { im.src = list[i]; return; }
+      done = true;
+      if (im.parentNode) im.parentNode.removeChild(im);
+      if (onGone) onGone();
+    });
+    im.src = list[0];
+    return im;
+  }
+
+  /* The one thing pages call. */
+  function element(id, name, size){
+    var wrap = el('span','ph');
+    if (size){ wrap.style.width = size + 'px'; wrap.style.height = size + 'px'; }
+
+    var code = codeFor(id, name);
+    if (!code){ wrap.textContent = initials(name); return wrap; }
+
+    wrap.appendChild(imgFor(code, function(){ wrap.textContent = initials(name); }));
+    return wrap;
+  }
+
+  function initials(name){
+    var n = String(name || '?').trim();
+    return n.substring(0,2).toUpperCase();
+  }
+
+  /* Say plainly how well this is working, rather than leaving it to
+     be judged by squinting at a page.                               */
+  function report(players){
+    var total = (players || []).length;
+    var withCode = 0, resolvable = 0, unresolved = [];
+
+    (players || []).forEach(function(p){
+      if (clean(p.code)) withCode++;
+      if (codeFor(p.id, p.web)) resolvable++;
+      else unresolved.push(p.web || p.name || p.id);
+    });
+
+    var shared = Object.keys(dropped);
+
+    return {
+      players: total,
+      withCode: withCode,
+      resolvable: resolvable,
+      byIdEntries: Object.keys(byId).length,
+      byNameEntries: Object.keys(byName).length,
+      sharedNamesDropped: shared.length,
+      sharedNames: shared.slice(0, 20),
+      unresolved: unresolved.slice(0, 20)
+    };
+  }
+
+  return {
+    build: build,
+    codeFor: codeFor,
+    urls: urls,
+    element: element,
+    report: report,
+    _sizes: SIZES
+  };
+})();
+
+/* Kept so the pages did not all need rewriting. */
+function playerPhoto(id, nm, size){ return PlayerPhotos.element(id, nm, size); }
+function playerPhotoUrl(id, nm){
+  var code = PlayerPhotos.codeFor(id, nm);
+  return code ? PlayerPhotos.urls(code)[0] : null;
 }
 
-function playerPhoto(id, nm, size){
-  var wrap = el('span','ph');
-  if (size){ wrap.style.width = size + 'px'; wrap.style.height = size + 'px'; }
-  var url = playerPhotoUrl(id, nm);
-  if (!url){ wrap.textContent = String(nm || '?').substring(0,2); return wrap; }
-  var im = document.createElement('img');
-  im.alt = ''; im.src = url;
-  im.addEventListener('error', function(){
-    if (im.parentNode) im.parentNode.removeChild(im);
-    wrap.textContent = String(nm || '?').substring(0,2);
-  });
-  wrap.appendChild(im);
-  return wrap;
+/* Type photoCheck() in the browser console to see how many of the 587
+   resolve, and which names were thrown away for being shared.      */
+function photoCheck(){
+  var r = PlayerPhotos.report(DATA.players);
+  console.log('player photos');
+  console.log('  players in the pool     ', r.players);
+  console.log('  with a code in the sheet', r.withCode);
+  console.log('  resolvable to a photo   ', r.resolvable);
+  console.log('  indexed by element id   ', r.byIdEntries);
+  console.log('  indexed by unique name  ', r.byNameEntries);
+  console.log('  names dropped as shared ', r.sharedNamesDropped, r.sharedNames);
+  if (r.unresolved.length) console.log('  unresolved              ', r.unresolved);
+  return r;
 }
 
 /* KO sheets - generic: label, home, hs, as, away */
@@ -1190,7 +1374,7 @@ function boot(){
   Promise.all(jobs).then(function(){
     /* the Transfer Player List carries bonus and the player code, so
        photos and bonus points come from the one sheet now           */
-    DATA.codes = codesFromTransfers(DATA.players);
+    PlayerPhotos.build(DATA.players);
     if (DATA.players) DATA.players.forEach(function(p){ p.bonus = p.bonus || 0; });
 
     bootDone = false;
@@ -1203,19 +1387,7 @@ function boot(){
   });
 }
 
-/* player id -> FPL photo code, taken from the Transfer Player List.
-   The 25/26 workbook had a separate Query1 tab for this; the new
-   Transfer Player List carries a Code column, so one fewer sheet.  */
-function codesFromTransfers(players){
-  var byId = {}, byName = {};
-  (players || []).forEach(function(p){
-    if (!p.code) return;
-    byId[String(p.id)] = String(p.code);
-    if (p.web) byName[String(p.web).toLowerCase().trim()] = String(p.code);
-    if (p.sec) byName[String(p.sec).toLowerCase().trim()] = String(p.code);
-  });
-  return { byId: byId, byName: byName };
-}
+
 
 /* =====================================================================
    HOME
