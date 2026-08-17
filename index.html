@@ -832,12 +832,28 @@ var PlayerPhotos = (function(){
   var dropped = {};       /* names thrown away, and how many shared  */
   var built = false;
 
-  /* Sizes are tried in turn. Not every player has every size on the
-     Premier League's servers, and a missing one 404s rather than
-     redirecting, so trying more than one is the difference between a
-     face and a set of initials.                                     */
-  var SIZES = ['250x250', '110x140', '40x40'];
-  var BASE  = 'https://resources.premierleague.com/premierleague/photos/players/';
+  /* THE PATH MATTERS AS MUCH AS THE CODE
+
+     Current:  .../premierleague25/photos/players/110x140/154561.png
+     Old:      .../premierleague/photos/players/110x140/p154561.png
+
+     Two differences, and both bite. The asset set is versioned -
+     premierleague25 - and the current one has NO "p" in front of the
+     code. The old path has not been taken down: it still answers for
+     plenty of players, just with photographs from an earlier season.
+
+     That is worse than a 404. A dead link shows initials and you know
+     something is wrong. A stale link shows a real face, of the right
+     player, three seasons ago, and looks like it is working.
+
+     So the current path is tried first and the old one is kept only as
+     a last resort, for anyone the new set has not got.
+
+     When the asset set rolls over - premierleague26 and so on - change
+     SET below and nothing else needs touching.                       */
+  var HOST  = 'https://resources.premierleague.com/';
+  var SET   = 'premierleague25';
+  var SIZES = ['110x140', '250x250'];
 
   function reset(){
     byId = {}; byName = {}; dropped = {}; built = false;
@@ -911,7 +927,12 @@ var PlayerPhotos = (function(){
   }
 
   function urls(code){
-    return SIZES.map(function(sz){ return BASE + sz + '/p' + code + '.png'; });
+    var out = SIZES.map(function(sz){
+      return HOST + SET + '/photos/players/' + sz + '/' + code + '.png';
+    });
+    /* last resort only - see the note above about stale faces */
+    out.push(HOST + 'premierleague/photos/players/110x140/p' + code + '.png');
+    return out;
   }
 
   /* An <img> that walks the sizes, then gives up quietly.           */
@@ -981,6 +1002,7 @@ var PlayerPhotos = (function(){
     urls: urls,
     element: element,
     report: report,
+    _set: SET,
     _sizes: SIZES
   };
 })();
