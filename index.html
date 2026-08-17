@@ -404,6 +404,8 @@ img{display:block;max-width:100%}
    ===================================================================== */
 var CONFIG = {
   season: '26/27',
+  /* '26/27' as the honours images are named: 2627 */
+  seasonCode: '2627',
   sheetBase: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzpbuaeYd1DzKkJszapnpA-iCmm_YPQmHuNxfYMhdMUGOjDtwuUsQFlqHEDpuQmpbr7aufi1UjhvQJ/pub?single=true&output=csv&gid=',
   refreshMs: 60000,
   leagues: [
@@ -503,16 +505,39 @@ var CONFIG = {
     'JLS':       { main:'#AFA1C5', second:'#FFFFFF', text:'#383458', fourth:'#000000' },
     'Paddy S':   { main:'#C1272D', second:'#181214', text:'#FFFFFF', fourth:'#FFFFFF' }
   },
+  /* key doubles as the image filename, so these match the files in
+     img/competitions and img/trophies exactly.                       */
   comps: [
-    { key:'league', name:'Overall league', colour:'#0091DA', meta:'GW1-38 - total points' },
-    { key:'h2h',    name:'Head to Head',   colour:'#003399', meta:'GW1-34 - final GW38' },
-    { key:'cup',    name:'FFS Cup',        colour:'#CC0000', meta:'GW21-30 - final GW38' },
-    { key:'super',  name:'Supercopa',      colour:'#C9A227', meta:'Apertura and Clausura' }
+    { key:'league',    name:'Overall league', colour:'#0091DA', meta:'GW1-38 - total points' },
+    { key:'h2h',       name:'Head to Head',   colour:'#003399', meta:'GW1-34 - final GW38' },
+    { key:'cup',       name:'Cup',            colour:'#CC0000', meta:'GW21-30 - final GW38' },
+    { key:'superliga', name:'SuperLiga',      colour:'#0B7A4B', meta:'All 22 - GW1-38' },
+    { key:'supercopa', name:'Supercopa',      colour:'#C9A227', meta:'Apertura and Clausura' }
   ],
   img: {
-    hero:      'img/hero/home.jpg',
-    manager:   function(name){ return 'img/managers/' + slug(name) + '.jpg'; },
-    comp:      function(key){ return 'img/comps/' + key + '.png'; }
+    hero:      'img/hero/home',
+    manager:   function(name){ return 'img/managers/' + slug(name); },
+    comp:      function(key){ return 'img/competitions/' + key; },
+    trophy:    function(key){ return 'img/trophies/' + key; },
+    motm:      function(month){ return 'img/motm/' + month; },
+
+    /* Honours: one image per competition per season, named
+       <competition>-<season>, e.g. league-1819, cup-2122, h2h-2324. */
+    champion:  function(key, season){ return 'img/champions/' + key + '-' + season; },
+
+    /* Bonus images, used wherever a page would otherwise look bare.
+       Numbered rather than named so more can be dropped in without
+       anyone having to think of a filename.                          */
+    outtake:   function(n){ return 'img/outtakes/outtake-' + n; },
+    outtakeCount: 11,
+
+    /* Tried in order until one loads. Saves converting everything to
+       one format, and means a png dropped in months from now works
+       without a code change. */
+    /* .jfif is a JPEG that Windows produces when you save an image
+       from a browser. It renders like any other JPEG, so it is here
+       rather than making anyone rename files.                        */
+    types:     ['.jpg', '.png', '.jpeg', '.jfif', '.webp', '.gif']
   }
 };
 
@@ -535,18 +560,39 @@ function el(tag, cls, text){
 }
 function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
 
+/* An image that tries each file type in turn, and does something
+   sensible if none of them exist.
+
+   The alternative is insisting every photo is a .jpg, which means
+   converting files by hand and remembering the rule months later when
+   you add one more. Four quiet 404s cost nothing; a photo that
+   silently never appears costs an evening.                          */
+function imgTry(base, onGone){
+  var im = document.createElement('img');
+  var i = 0, done = false;
+  im.alt = '';
+  im.addEventListener('error', function(){
+    /* A browser can fire error more than once for the same element.
+       Without this, the fallback runs again on each one and you get
+       three "HERO IMAGE SLOT" placeholders stacked up instead of one. */
+    if (done) return;
+    i++;
+    if (i < CONFIG.img.types.length) { im.src = base + CONFIG.img.types[i]; return; }
+    done = true;
+    if (im.parentNode) im.parentNode.removeChild(im);
+    if (onGone) onGone();
+  });
+  im.src = base + CONFIG.img.types[0];
+  return im;
+}
+
 /* photo element with graceful fallback to initials */
 function photo(name, size){
   var wrap = el('span','ph');
   if (size) { wrap.style.width = size + 'px'; wrap.style.height = size + 'px'; }
-  var im = document.createElement('img');
-  im.alt = '';
-  im.src = CONFIG.img.manager(name);
-  im.addEventListener('error', function(){
-    if (im.parentNode) im.parentNode.removeChild(im);
+  wrap.appendChild(imgTry(CONFIG.img.manager(name), function(){
     wrap.textContent = String(name).substring(0,2);
-  });
-  wrap.appendChild(im);
+  }));
   return wrap;
 }
 
@@ -1203,13 +1249,11 @@ function renderHome(){
 
   /* hero */
   var hero = el('div','hero');
-  var him = document.createElement('img');
-  him.alt = ''; him.src = CONFIG.img.hero;
-  him.addEventListener('error', function(){
-    if (him.parentNode) him.parentNode.removeChild(him);
+  /* every file type is tried before the placeholder appears, so a png
+     hero does not get replaced by "HERO IMAGE SLOT" on the first miss */
+  var him = imgTry(CONFIG.img.hero, function(){
     var slot = el('div','hero-slot');
-    var inner = el('div', null, 'HERO IMAGE SLOT');
-    slot.appendChild(inner);
+    slot.appendChild(el('div', null, 'HERO IMAGE SLOT'));
     hero.insertBefore(slot, hero.firstChild);
   });
   hero.appendChild(him);
@@ -1256,7 +1300,8 @@ function renderHome(){
     if (c.key === 'league') { winner = leader.name; note = leader.points + ' pts - ' + (complete ? 'won by ' + margin : margin + ' ahead'); }
     if (c.key === 'h2h')    { winner = h2hWin.name || '-'; note = h2hWin.note || c.meta; }
     if (c.key === 'cup')    { winner = cupWin.name || '-'; note = cupWin.note || c.meta; }
-    if (c.key === 'super')  { winner = '-'; note = 'First edition next season'; }
+    if (c.key === 'superliga') { winner = '-'; note = c.meta; }
+    if (c.key === 'supercopa') { winner = '-'; note = c.meta; }
 
     var row = el('div','comp');
     row.style.borderLeftColor = c.colour;
@@ -1265,12 +1310,7 @@ function renderHome(){
     if (winner === '-') row.style.opacity = '.72';
 
     var lg = el('div','comp-logo');
-    var lim = document.createElement('img');
-    lim.alt = ''; lim.src = CONFIG.img.comp(c.key);
-    lim.addEventListener('error', function(){
-      if (lim.parentNode) lim.parentNode.removeChild(lim);
-      lg.textContent = 'LOGO';
-    });
+    var lim = imgTry(CONFIG.img.comp(c.key), function(){ lg.textContent = 'LOGO'; });
     lg.appendChild(lim);
     row.appendChild(lg);
 
@@ -1571,12 +1611,7 @@ function renderLeague(){
   mast.appendChild(bands);
   var copy = el('div','copy');
   var slot = el('div','lt-slot');
-  var lsIm = document.createElement('img');
-  lsIm.alt = ''; lsIm.src = CONFIG.img.comp('league');
-  lsIm.addEventListener('error', function(){
-    if (lsIm.parentNode) lsIm.parentNode.removeChild(lsIm);
-    slot.textContent = 'LOGO';
-  });
+  var lsIm = imgTry(CONFIG.img.comp('league'), function(){ slot.textContent = 'LOGO'; });
   slot.appendChild(lsIm);
   copy.appendChild(slot);
   var inner = el('div');
@@ -1826,12 +1861,7 @@ function renderH2H(){
   /* masthead */
   var mast = el('div','h2h-mast');
   var slot = el('div','h2h-slot');
-  var sIm = document.createElement('img');
-  sIm.alt = ''; sIm.src = CONFIG.img.comp('h2h');
-  sIm.addEventListener('error', function(){
-    if (sIm.parentNode) sIm.parentNode.removeChild(sIm);
-    slot.textContent = 'LOGO';
-  });
+  var sIm = imgTry(CONFIG.img.comp('h2h'), function(){ slot.textContent = 'LOGO'; });
   slot.appendChild(sIm);
   mast.appendChild(slot);
   var mid = el('div');
@@ -2075,13 +2105,10 @@ function buildRecord(host){
 
   function avatar(host2, name){
     clear(host2);
-    var im = document.createElement('img');
-    im.alt = ''; im.src = CONFIG.img.manager(name);
-    im.style.cssText = 'width:100%;height:100%;object-fit:cover';
-    im.addEventListener('error', function(){
-      if (im.parentNode) im.parentNode.removeChild(im);
+    var im = imgTry(CONFIG.img.manager(name), function(){
       host2.textContent = name.substring(0,2);
     });
+    im.style.cssText = 'width:100%;height:100%;object-fit:cover';
     host2.appendChild(im);
   }
 
@@ -2214,10 +2241,7 @@ function buildKnockout(host){
 
     var p = el('div','panel');
     var av = el('div','av');
-    var im = document.createElement('img');
-    im.alt = ''; im.src = CONFIG.img.manager(win.name);
-    im.addEventListener('error', function(){
-      if (im.parentNode) im.parentNode.removeChild(im);
+    var im = imgTry(CONFIG.img.manager(win.name), function(){
       av.textContent = win.name.substring(0,2);
     });
     av.appendChild(im);
@@ -2230,7 +2254,7 @@ function buildKnockout(host){
 
     var tro = el('div','tro');
     var tim = document.createElement('img');
-    tim.alt = ''; tim.src = 'img/trophies/h2h.png';
+    tim = imgTry(CONFIG.img.trophy('h2h'), null);
     tim.addEventListener('error', function(){
       if (tim.parentNode) tim.parentNode.removeChild(tim);
       tro.textContent = 'TROPHY';
@@ -2283,9 +2307,7 @@ function renderCup(){
 
   var mast = el('div','cup-mast');
   var slot = el('div','cup-slot');
-  var im = document.createElement('img');
-  im.alt=''; im.src = CONFIG.img.comp('cup');
-  im.addEventListener('error', function(){ if(im.parentNode) im.parentNode.removeChild(im); slot.textContent='LOGO'; });
+  var im = imgTry(CONFIG.img.comp('cup'), function(){ slot.textContent = 'LOGO'; });
   slot.appendChild(im);
   mast.appendChild(slot);
   var mid = el('div');
@@ -2453,10 +2475,8 @@ function cupKnockout(host){
     var av = el('div','av');
     av.style.cssText = 'width:48px;height:48px;border-radius:50%;background:#5C646E;border:2px solid #EDEFF2;display:flex;'
       + 'align-items:center;justify-content:center;color:#EDEFF2;font-size:15px;font-weight:800;flex-shrink:0;overflow:hidden';
-    var aim = document.createElement('img');
-    aim.alt=''; aim.src = CONFIG.img.manager(win.name);
+    var aim = imgTry(CONFIG.img.manager(win.name), function(){ av.textContent = win.name.substring(0,2); });
     aim.style.cssText='width:100%;height:100%;object-fit:cover';
-    aim.addEventListener('error', function(){ if(aim.parentNode) aim.parentNode.removeChild(aim); av.textContent = win.name.substring(0,2); });
     av.appendChild(aim);
     pnl.appendChild(av);
     var m = el('div'); m.style.flex='1';
@@ -2470,7 +2490,7 @@ function cupKnockout(host){
     tro.style.cssText='width:56px;height:56px;border:1px dashed #8A929C;display:flex;align-items:center;justify-content:center;'
       + 'flex-shrink:0;font-size:6px;font-weight:800;letter-spacing:.7px;color:#5C646E;overflow:hidden';
     var tim = document.createElement('img');
-    tim.alt=''; tim.src='img/trophies/cup.png';
+    tim = imgTry(CONFIG.img.trophy('cup'), null);
     tim.style.cssText='width:100%;height:100%;object-fit:contain';
     tim.addEventListener('error', function(){ if(tim.parentNode) tim.parentNode.removeChild(tim); tro.textContent='TROPHY'; });
     tro.appendChild(tim);
