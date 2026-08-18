@@ -494,9 +494,8 @@ var CONFIG = {
       ledger:        '70428418',
       fixtures:      '727393446',
       positions:     '1065222355',
-      motmCalc:      '1242719057'
-      /* text: '' - add the USER_TEXT gid once it is published.
-         Until then txt() falls back to the wording in the code. */
+      motmCalc:      '1242719057',
+      text:          '669929533'
     }
   },
 
@@ -768,7 +767,16 @@ function parseCupGroups(rows){
     if (m) { where = m[1]; if (!groups[where]) groups[where] = []; return; }
 
     if (f0 === 'Fixtures' || (f0 === 'GW' && r[1] === 'Home')) { where = 'f'; return; }
-    if (f0 === 'Pos') return;
+
+    /* A Pos header with no group declared above it means a single
+       table - the SuperLiga, whose heading reads "SuperLiga Table"
+       rather than "Group A". Without this every row was discarded and
+       the page reported the competition as unbuilt, which is a
+       miserable way to be told a parser does not recognise a heading. */
+    if (f0 === 'Pos') {
+      if (where === '' || where === 'f') { where = '_'; groups['_'] = groups['_'] || []; }
+      return;
+    }
 
     if (where === 'f' && f0.indexOf('GW') === 0){
       fixtures.push({ gw:num(f0.replace('GW','')), home:r[1], hs:r[2], as:r[3], away:r[4] });
@@ -780,7 +788,13 @@ function parseCupGroups(rows){
     }
   });
 
-  return { a: groups.A || [], b: groups.B || [], groups: groups, fixtures: fixtures };
+  /* the single table comes back as .table; the lettered ones as
+     .groups, with .a and .b kept for the cup page */
+  var single = groups['_'] || null;
+  if (single) delete groups['_'];
+
+  return { a: groups.A || [], b: groups.B || [], groups: groups,
+           table: single, fixtures: fixtures };
 }
 
 /* Fixtures sheet: competition | league_key | stage | gw | home | away | note
@@ -4118,15 +4132,19 @@ function goldMast_(title, sub, rightLabel, rightValue, imgKey){
   var top = el('div');
   top.style.cssText = 'padding:22px 22px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap';
 
+  /* The border is only there so an absent logo has an outline. Once
+     one loads it would frame the artwork, so it is removed rather
+     than left showing round the edge of a badge.                    */
   var slot = el('div');
-  slot.style.cssText = 'width:48px;height:48px;border:2px solid #fff;display:flex;'
-    + 'align-items:center;justify-content:center;flex-shrink:0';
+  slot.style.cssText = 'width:72px;height:72px;border:2px solid rgba(255,255,255,.45);'
+    + 'display:flex;align-items:center;justify-content:center;flex-shrink:0';
   slot.appendChild(imgTry(CONFIG.img.comp(imgKey), function(){
     slot.textContent = 'LOGO';
     slot.style.fontSize = '8px';
     slot.style.fontWeight = '800';
     slot.style.color = '#fff';
   }));
+  if (slot.firstChild && slot.firstChild.tagName === 'IMG') slot.style.border = 'none';
   var si = slot.firstChild;
   if (si && si.style) si.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
   top.appendChild(slot);
@@ -4380,7 +4398,7 @@ function paintSuperLiga(host){
     return;
   }
 
-  if (SL_VIEW === 'fix') return superLigaFixtures_(body);
+  if (SL_VIEW === 'fix') return superLigaFixtures_(body, host);
 
   /* the scrubber, same idea as the League tab */
   var maxGw = superLigaMaxGw_();
@@ -4467,13 +4485,82 @@ function goldScrub_(maxGw, host){
   return bar;
 }
 
-function superLigaFixtures_(body){
+var SL_FX = { gw: null };
+
+function superLigaFixtures_(body, host){
   var fx = (DATA.fixtures || []).filter(function(f){ return f.comp === 'SuperLiga'; });
   if (!fx.length){
     body.appendChild(goldNote_(txt('empty.fixtures', 'No fixtures to come.')));
     return;
   }
-  body.appendChild(gwFixtureList_(fx, GOLD_DEEP));
+  body.appendChild(gwFixtureScroller_(fx, GOLD_DEEP, SL_FX,
+    function(){ paintSuperLiga(host); }));
+}
+
+/* One gameweek at a time, with arrows - the same mechanic the Head to
+   Head page uses. A hundred and ten fixtures in one scroll is a wall;
+   eleven at a time is a matchday.
+
+   `state` is an object with a .gw the caller owns, so each page keeps
+   its own place rather than sharing one global. */
+function gwFixtureScroller_(fixtures, accent, state, repaint){
+  var wrap = el('div');
+  wrap.style.cssText = 'padding:0 0 20px';
+
+  var byGw = {}, gws = [];
+  fixtures.forEach(function(f){
+    if (!byGw[f.gw]) { byGw[f.gw] = []; gws.push(f.gw); }
+    byGw[f.gw].push(f);
+  });
+  gws.sort(function(a,b){ return a - b; });
+  if (!gws.length) return wrap;
+
+  if (state.gw === null || gws.indexOf(state.gw) < 0) state.gw = latestPlayedGw_(gws);
+  var idx = gws.indexOf(state.gw);
+
+  var bar = el('div');
+  bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:14px 22px 12px';
+
+  function arrow(sym, d, on){
+    var b = el('button', null, sym);
+    b.style.cssText = 'width:28px;height:28px;border:1px solid rgba(255,255,255,'
+      + (on ? '.7' : '.25') + ');background:none;color:rgba(255,255,255,' + (on ? '1' : '.35')
+      + ');font:inherit;font-size:14px;cursor:' + (on ? 'pointer' : 'default')
+      + ';display:flex;align-items:center;justify-content:center;flex-shrink:0';
+    if (on) b.addEventListener('click', function(){ state.gw = gws[idx + d]; repaint(); });
+    return b;
+  }
+  bar.appendChild(arrow('\u2039', -1, idx > 0));
+  bar.appendChild(cell_('GAMEWEEK ' + state.gw,
+    'font-size:15px;font-weight:900;color:#fff;letter-spacing:.5px;min-width:132px;text-align:center'));
+  bar.appendChild(arrow('\u203a', 1, idx < gws.length - 1));
+  bar.appendChild(cell_((idx + 1) + ' of ' + gws.length,
+    'margin-left:auto;font-size:10px;font-weight:800;letter-spacing:1.1px;color:rgba(255,255,255,.72)'));
+  wrap.appendChild(bar);
+
+  var grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));'
+    + 'gap:9px;padding:0 16px';
+  byGw[state.gw].forEach(function(f){
+    var hs = DATA.scores[f.home] && DATA.scores[f.home][f.gw];
+    var as = DATA.scores[f.away] && DATA.scores[f.away][f.gw];
+    grid.appendChild(scoreRow_(f.home, hs, f.away, as, accent, { tight: true }));
+  });
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+/* Open on the most recent gameweek that has been played, not on
+   gameweek one - nobody wants to arrive in August in March. */
+function latestPlayedGw_(gws){
+  var best = gws[0];
+  gws.forEach(function(g){
+    var any = Object.keys(DATA.scores).some(function(n){
+      return DATA.scores[n][g] !== undefined;
+    });
+    if (any) best = g;
+  });
+  return best;
 }
 
 /* Fixtures grouped by gameweek, drawn with the scoreline row. */
@@ -4516,7 +4603,9 @@ function goldNote_(text){
    ===================================================================== */
 
 var SC_HALF = 'apertura';
+var SC_VIEW = 'stand';
 var SC_TIE_OPEN = null;
+var SC_FX = { gw: null };
 
 function renderSupercopa(){
   var host = document.getElementById('p-super');
@@ -4546,6 +4635,10 @@ function paintSupercopa(host){
 
   if (isCopa) return copaPanel_(body, host);
 
+  /* the second bar: which part of this half you are looking at */
+  body.appendChild(scSubTabs_(host));
+  body.appendChild(goldRule_());
+
   var g = SC_HALF === 'apertura' ? DATA.apertura : DATA.clausura;
   var groups = g && g.groups ? g.groups : null;
 
@@ -4553,6 +4646,29 @@ function paintSupercopa(host){
     body.appendChild(goldNote_(txt('empty.supercopa',
       'This half has not been built yet. Fill in the Group Draws, generate the '
       + 'Supercopa fixtures and rebuild it.')));
+    return;
+  }
+
+  if (SC_VIEW === 'fix'){
+    var fx = (DATA.fixtures || []).filter(function(f){
+      return f.comp === name && (f.stage.indexOf('Group') === 0 || f.stage === 'Idle');
+    });
+    if (!fx.length){
+      body.appendChild(goldNote_('No group fixtures generated for this half yet.'));
+      return;
+    }
+    body.appendChild(gwFixtureScroller_(fx, GOLD_DEEP, SC_FX,
+      function(){ paintSupercopa(host); }));
+    return;
+  }
+
+  if (SC_VIEW === 'ko'){
+    var ties = knockoutTies_(name);
+    if (!ties.length){
+      body.appendChild(goldNote_('The knockout is drawn once the groups have finished.'));
+      return;
+    }
+    body.appendChild(knockoutBlock_(ties, host));
     return;
   }
 
@@ -4571,18 +4687,27 @@ function paintSupercopa(host){
   });
   body.appendChild(grid);
   body.appendChild(goldKey_([[GOLD_DARK,'TOP THREE ADVANCE']]));
+}
 
-  body.appendChild(goldRule_());
-  var ties = knockoutTies_(name);
-  if (ties.length) body.appendChild(knockoutBlock_(ties, host));
-
-  var fx = (DATA.fixtures || []).filter(function(f){
-    return f.comp === name && (f.stage.indexOf('Group') === 0 || f.stage === 'Idle');
+function scSubTabs_(host){
+  var bar = el('div');
+  bar.style.cssText = 'display:flex;gap:20px;padding:12px 22px 10px;overflow-x:auto';
+  [['stand','Standings'],['fix','Fixtures'],['ko','Knockout']].forEach(function(v){
+    var on = SC_VIEW === v[0];
+    var b = el('button', null, v[1].toUpperCase());
+    b.style.cssText = 'font:inherit;font-size:10px;font-weight:900;letter-spacing:1.4px;'
+      + 'cursor:pointer;background:none;border:none;white-space:nowrap;padding:0 0 6px;'
+      + 'color:' + (on ? '#fff' : 'rgba(255,255,255,.55)')
+      + ';border-bottom:2px solid ' + (on ? '#fff' : 'transparent');
+    b.addEventListener('click', function(){
+      if (on) return;
+      SC_VIEW = v[0];
+      SC_TIE_OPEN = null;
+      paintSupercopa(host);
+    });
+    bar.appendChild(b);
   });
-  if (fx.length){
-    body.appendChild(goldRule_());
-    body.appendChild(gwFixtureList_(fx, GOLD_DEEP));
-  }
+  return bar;
 }
 
 /* Ties assembled by pairing M<n> leg 1 with M<n> leg 2. */
@@ -4754,10 +4879,13 @@ function paintHonours(host){
   var top = el('div');
   top.style.cssText = 'display:flex;align-items:center;gap:14px;padding-bottom:15px';
   var slot = el('div');
-  slot.style.cssText = 'width:42px;height:42px;border:1px dashed rgba(255,255,255,.4);'
-    + 'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
-    + 'font-size:8px;font-weight:800;color:rgba(255,255,255,.45)';
-  slot.appendChild(imgTry(CONFIG.img.comp('league'), function(){ slot.textContent = 'LOGO'; }));
+  slot.style.cssText = 'width:66px;height:66px;display:flex;align-items:center;'
+    + 'justify-content:center;flex-shrink:0;font-size:8px;font-weight:800;'
+    + 'color:rgba(255,255,255,.45)';
+  slot.appendChild(imgTry(CONFIG.img.comp('league'), function(){
+    slot.textContent = 'LOGO';
+    slot.style.border = '1px solid rgba(255,255,255,.25)';
+  }));
   var mi = slot.firstChild;
   if (mi && mi.style) mi.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
   top.appendChild(slot);
@@ -4834,12 +4962,12 @@ function honChampions(pad){
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));'
       + 'gap:12px;margin-bottom:20px';
     perLeague.forEach(function(c){
-      grid.appendChild(holderCard_(c[0], c[1], c[2], holderFor_(latest, c[0], lg.key)));
+      grid.appendChild(holderCard_(c[0], c[1], c[2], holderFor_(latest, c[0], lg.name)));
     });
     pad.appendChild(grid);
   });
 
-  pad.appendChild(honHead_('All 22 managers'));
+  pad.appendChild(honHead_('Combined'));
   var g2 = el('div');
   g2.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));'
     + 'gap:12px;margin-bottom:22px';
@@ -4852,18 +4980,43 @@ function honChampions(pad){
   pad.appendChild(rollTable_());
 }
 
-/* USER_CHAMPIONS is one row per season with a column per competition,
-   so the holder is read by column name rather than by position. */
-function holderFor_(row, compLabel, leagueKey){
+/* Which manager holds a trophy, read from USER_CHAMPIONS by column
+   name rather than by position.
+
+   A per-league trophy needs the league in the column name, because
+   both leagues have a League, a Head to Head and a Cup - "FFS Cup"
+   and "Audit Cup" are different trophies. Without that the Audit
+   panels showed the FFS winners, which is worse than showing nothing:
+   it is a real name, in the right place, and wrong.
+
+   A bare "Cup" column is taken as the draft league's, so an archive
+   written before the second league existed still reads correctly. */
+function holderFor_(row, compLabel, leagueName){
   if (!row) return null;
+
   var want = compLabel.toLowerCase();
-  var hit = null;
-  Object.keys(row.by || {}).forEach(function(k){
-    var kk = k.toLowerCase();
-    if (hit) return;
-    if (kk.indexOf(want) >= 0 || want.indexOf(kk) >= 0) hit = row.by[k];
-  });
-  return hit || null;
+  var lg = leagueName ? leagueName.toLowerCase().replace(' league','') : null;
+  var keys = Object.keys(row.by || {});
+
+  /* exact league-qualified match first */
+  if (lg){
+    for (var i = 0; i < keys.length; i++){
+      var k = keys[i].toLowerCase();
+      if (k.indexOf(lg) === 0 && k.indexOf(want.replace('overall ','')) >= 0) return row.by[keys[i]];
+    }
+  }
+
+  /* an unqualified column belongs to the draft league only */
+  var draft = CONFIG.leagues[0];
+  var allowBare = !leagueName || leagueName === draft.name;
+  if (!allowBare) return null;
+
+  for (var j = 0; j < keys.length; j++){
+    var kk = keys[j].toLowerCase();
+    if (kk.indexOf('ffs') === 0 || kk.indexOf('audit') === 0) continue;
+    if (kk === want || kk === want.replace('overall ','')) return row.by[keys[j]];
+  }
+  return null;
 }
 
 function holderCard_(label, colour, imgKey, name){
@@ -4889,11 +5042,11 @@ function holderCard_(label, colour, imgKey, name){
   card.appendChild(art);
 
   var foot = el('div');
-  foot.style.cssText = 'padding:11px 13px 13px;display:flex;align-items:center;gap:10px';
+  foot.style.cssText = 'padding:12px 13px 13px;display:flex;align-items:center;gap:11px';
   var av = el('span');
-  av.style.cssText = 'width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+  av.style.cssText = 'width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;'
     + 'background:#F2F5F8;border:2px solid ' + colour + ';display:flex;'
-    + 'align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#a3adb7';
+    + 'align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#a3adb7';
   if (name){
     av.appendChild(imgTry(CONFIG.img.manager(name), function(){
       av.textContent = name.substring(0,2).toUpperCase();
@@ -4910,6 +5063,19 @@ function holderCard_(label, colour, imgKey, name){
   t.appendChild(cell_(name ? CONFIG.season : txt('label.pending', 'First edition ' + CONFIG.season),
     'display:block;font-size:10px;color:#8a939c;margin-top:1px'));
   foot.appendChild(t);
+
+  /* the trophy itself, so the card says what was won as well as who
+     won it. Absent artwork leaves nothing rather than a hole. */
+  var tro = el('span');
+  tro.style.cssText = 'width:40px;height:40px;flex-shrink:0;display:flex;'
+    + 'align-items:center;justify-content:center';
+  tro.appendChild(imgTry(CONFIG.img.trophy(imgKey), function(){
+    if (tro.parentNode) tro.parentNode.removeChild(tro);
+  }));
+  var ti = tro.firstChild;
+  if (ti && ti.style) ti.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+  foot.appendChild(tro);
+
   card.appendChild(foot);
   return card;
 }
