@@ -49,6 +49,22 @@ img{display:block;max-width:100%}
 .main{flex:1;min-width:0}
 .page{display:none}
 .page.on{display:block}
+/* the ticker: two identical copies of the text and one transform.
+   No absolute positioning, so it cannot fight the layout around it -
+   which is what broke every previous attempt. */
+@keyframes potick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.po-track{display:flex;width:max-content;animation:potick 38s linear infinite}
+@media(prefers-reduced-motion:reduce){.po-track{animation:none}}
+
+/* on a phone the live panel comes first and the player list follows -
+   there you are reading far more often than bidding */
+@media(max-width:760px){
+  .po-grid{flex-direction:column}
+  .po-left{width:100%!important;position:static!important;order:2;
+           border-right:none!important;border-top:1px solid #383838}
+  .po-right{order:1}
+}
+
 /* notices - typed into USER_TEXT, live within minutes because that
    sheet is read straight from the published CSV rather than waiting
    on the nightly rebuild */
@@ -60,7 +76,10 @@ img{display:block;max-width:100%}
 .notice.good{background:#0B7A4B;color:#fff}
 .notice .ic{font-size:17px;flex-shrink:0;opacity:.9}
 .notice .x{font-size:14px;opacity:.6;cursor:pointer;flex-shrink:0}
-#notices{position:relative;z-index:40}
+/* Outside .shell, not inside it. As a flex child of the shell it
+   became a third column beside the sidebar and shunted the whole page
+   across - a banner has to span the lot or it is not a banner. */
+#notices{position:relative;z-index:40;max-width:1360px;margin:0 auto}
 #notices .last{border-bottom:3px solid rgba(255,255,255,.45)}
 
 /* league bar - which strand you are looking at, on every page that
@@ -383,6 +402,7 @@ img{display:block;max-width:100%}
 </style>
 </head>
 <body>
+<div id="notices"></div>
 <div class="shell">
   <aside class="side">
     <div class="brand">
@@ -399,7 +419,6 @@ img{display:block;max-width:100%}
     </div>
   </aside>
 
-  <div id="notices"></div>
   <main class="main">
     <div class="lgbar" id="lgbar"></div>
     <section class="page on" id="p-home"><div class="load"><div class="spin"></div>Loading season data</div></section>
@@ -1600,6 +1619,29 @@ function txt(key, fallback){
   return (t && t[key]) || fallback || '';
 }
 
+/* Squad Register: timestamp | league_key | action | element_id
+   | player | manager | fee | note
+
+   The transaction log the draft tool writes. The portal reads it for
+   the ticker, the done-deal panel and the feed, so those show what
+   actually happened rather than anything worked out afterwards.    */
+function parseRegister(rows){
+  if (!rows || rows.length < 2) return [];
+  var out = [];
+  rows.slice(1).forEach(function(r){
+    var action = String(r[2] || '').trim().toUpperCase();
+    var player = String(r[4] || '').trim();
+    if (!action || !player) return;
+    out.push({
+      ts: r[0], leagueKey: String(r[1] || '').trim(), action: action,
+      elementId: String(r[3] || '').trim(), player: player,
+      manager: String(r[5] || '').trim(), fee: num(r[6]),
+      note: String(r[7] || '').trim()
+    });
+  });
+  return out;
+}
+
 function parseKits(rows){
   if (!rows || !rows.length) return null;
   var out = {};
@@ -1684,7 +1726,7 @@ var LEAGUE = CONFIG.leagues[0];
 var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2hForm:null,
              players:null, codes:null, bonus:null, squads:{}, byLeague:{},
              fixtures:[], scores:{}, positions:null,
-             motm:[], champions:[], historic:[], text:null };
+             motm:[], champions:[], historic:[], text:null, register:[] };
 var loaded = { home:false, league:false, h2h:false, cup:false, managers:false,
                players:false, portal:false, sliga:false, super:false, honours:false };
 var route = 'home';
@@ -1839,6 +1881,8 @@ function boot(){
     .then(function(k){ DATA.kits = k; }));
   jobs.push(fetchSheet(SHARED,'text').then(parseText).catch(function(){ return null; })
     .then(function(t){ DATA.text = t; }));
+  jobs.push(fetchSheet(SHARED,'register').then(parseRegister).catch(function(){ return []; })
+    .then(function(r){ DATA.register = r; }));
 
   /* one sheet holds every competition's fixtures, which is what makes
      a combined record across all of them possible */
@@ -5729,200 +5773,817 @@ function renderPlayers(){
    ===================================================================== */
 var poPos = 'ALL', poQ = '';
 
+/* =====================================================================
+   TRANSFER PORTAL
+
+   The one tab that should feel like an event rather than a product,
+   and the only place a dark theme is justified. Everything else on the
+   site stays light.
+
+   Three views:
+     Draft Day     available players beside the live board and feed
+     Squads        every manager's fifteen filling by position
+     Audit League  their weekly moves, which work nothing like ours
+
+   League 1 only on the first two. The Audit League has no draft, no
+   fees and no budget, so a budget board would be an empty table with
+   a misleading heading.
+   ===================================================================== */
+
+var PORTAL_VIEW = 'draft';
+var PO_POS = 'ALL';
+var PO_Q = '';
+var PO_BOARD = 0;      /* squad board alternates between two readings */
+var PO_FEED = 0;       /* latest, or biggest fees */
+var PO_BOARD_TIMER = null;
+
+var PO_YELLOW = '#FFDF00';
+var PO_DARK   = '#1E1E1E';
+var PO_PANEL  = '#252525';
+var PO_POSCOL = { GK:'#5b8def', DEF:'#4CAF50', MID:'#E8B84B', FWD:'#E85C6A' };
+
 function renderPortal(){
   var host = document.getElementById('p-portal');
   if (loaded.portal) return;
-  if (!DATA.players || !DATA.players.length){
-    clear(host); host.appendChild(el('div','err','Could not load the Transfer Player List sheet.')); return;
-  }
   loaded.portal = true;
+  paintPortal(host);
+}
+
+function paintPortal(host){
   clear(host);
+  if (PO_BOARD_TIMER) { clearInterval(PO_BOARD_TIMER); PO_BOARD_TIMER = null; }
 
-  var wrap = el('div','po');
-  var top = el('div','po-top');
-  var chevs = el('div'); chevs.style.cssText = 'display:flex;gap:3px';
-  for (var i = 0; i < 3; i++) chevs.appendChild(el('span','po-chev'));
-  top.appendChild(chevs);
-  var td = el('div');
-  td.appendChild(el('h2', null, 'DEADLINE DAY'));
-  td.appendChild(el('p', null, 'FFS DRAFT - TRANSFER PORTAL'));
-  top.appendChild(td);
-  wrap.appendChild(top);
-
-  var body = el('div','po-wrap');
-
-  /* left: available */
-  var left = el('div','po-left');
-  left.appendChild(el('h3', null, 'AVAILABLE'));
-  var srch = el('div','po-srch');
-  var inp = document.createElement('input'); inp.placeholder = 'Search';
-  srch.appendChild(inp); left.appendChild(srch);
-  var pills = el('div','po-pills');
-  ['ALL','GK','DEF','MID','FWD'].forEach(function(v){
-    var b = document.createElement('button'); b.textContent = v; b.setAttribute('data-p', v);
-    if (v === 'ALL') b.className = 'on';
-    pills.appendChild(b);
-  });
-  left.appendChild(pills);
-  var list = el('div','po-list');
-  left.appendChild(list);
-  body.appendChild(left);
-
-  /* right */
-  var right = el('div','po-right');
-  right.appendChild(el('div','po-h','SQUAD BOARD'));
-  var board = el('div');
-  right.appendChild(board);
-  right.appendChild(el('div','po-h','BIGGEST FEES'));
-  var feed = el('div');
-  right.appendChild(feed);
-  body.appendChild(right);
-  wrap.appendChild(body);
+  var wrap = el('div');
+  wrap.style.cssText = 'background:' + PO_DARK + ';color:#fff;min-height:70vh';
   host.appendChild(wrap);
 
-  var note = el('div','note');
-  note.style.margin = '0';
-  note.style.background = '#1E1E1E';
-  note.style.borderColor = '#333';
-  note.style.color = 'rgba(255,255,255,.5)';
-  note.textContent = 'A live signing feed needs a timestamp column from the Apps Script. Until then this shows the '
-    + 'biggest fees paid rather than the most recent deals.';
-  wrap.appendChild(note);
+  wrap.appendChild(portalMast_(host));
 
-  function paintList(){
+  if (PORTAL_VIEW === 'squads') return portalSquads_(wrap);
+  if (PORTAL_VIEW === 'audit')  return portalAudit_(wrap);
+  portalDraftDay_(wrap, host);
+}
+
+function portalMast_(host){
+  var head = el('div');
+  head.style.cssText = 'padding:16px 18px 0';
+
+  var top = el('div');
+  top.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:14px';
+
+  var chev = el('div');
+  chev.style.cssText = 'display:flex;gap:3px';
+  for (var i = 0; i < 3; i++){
+    var c = el('span');
+    c.style.cssText = 'width:11px;height:18px;background:' + PO_YELLOW
+      + ';clip-path:polygon(0 0,55% 50%,0 100%,45% 100%,100% 50%,45% 0)';
+    chev.appendChild(c);
+  }
+  top.appendChild(chev);
+
+  var titles = { draft:['DRAFT DAY', draftSub_()],
+                 squads:['SQUADS', 'FILLING LIVE  \u00b7  ' + draftManagers_().length + ' MANAGERS'],
+                 audit:['AUDIT LEAGUE', 'WEEKLY MOVES  \u00b7  NO FEES'] };
+  var t = titles[PORTAL_VIEW] || titles.draft;
+
+  var tt = el('div');
+  tt.appendChild(cell_(t[0],
+    'display:block;font-size:26px;font-weight:900;color:' + PO_YELLOW
+    + ';letter-spacing:-.6px;line-height:1'));
+  tt.appendChild(cell_(t[1],
+    'display:block;font-size:9px;font-weight:700;letter-spacing:1.6px;'
+    + 'color:rgba(255,255,255,.42);margin-top:3px'));
+  top.appendChild(tt);
+  head.appendChild(top);
+
+  var tabs = el('div');
+  tabs.style.cssText = 'display:flex;gap:20px;overflow-x:auto';
+  [['draft','Draft Day'],['squads','Squads'],['audit','Audit League']].forEach(function(v){
+    var on = PORTAL_VIEW === v[0];
+    var b = el('button', null, v[1].toUpperCase());
+    b.style.cssText = 'font:inherit;font-size:10px;font-weight:900;letter-spacing:1.4px;'
+      + 'cursor:pointer;background:none;border:none;white-space:nowrap;padding:0 0 10px;'
+      + 'color:' + (on ? PO_YELLOW : 'rgba(255,255,255,.45)')
+      + ';border-bottom:3px solid ' + (on ? PO_YELLOW : 'transparent');
+    b.addEventListener('click', function(){
+      if (on) return;
+      PORTAL_VIEW = v[0];
+      paintPortal(host);
+    });
+    tabs.appendChild(b);
+  });
+  head.appendChild(tabs);
+  return head;
+}
+
+/* The subtitle says which phase the workbook is in, so the page is
+   honest about whether anything is actually happening. */
+function draftSub_(){
+  var draft = CONFIG.leagues[0];
+  var reg = DATA.register || [];
+  var signed = reg.filter(function(r){ return r.action === 'SIGN'; }).length;
+  return draft.name.toUpperCase() + '  \u00b7  '
+    + (signed ? signed + ' SIGNINGS' : 'NOTHING SIGNED YET');
+}
+
+function draftManagers_(){
+  var d = DATA.byLeague[CONFIG.leagues[0].key];
+  if (d && d.squads && d.squads.summary.length){
+    return d.squads.summary.map(function(m){ return m.name; });
+  }
+  return (DATA.table || []).map(function(t){ return t.name; });
+}
+
+
+/* =====================================================================
+   DRAFT DAY
+   ===================================================================== */
+
+function portalDraftDay_(wrap, host){
+  wrap.appendChild(portalTicker_());
+
+  var grid = el('div', 'po-grid');
+  grid.style.cssText = 'display:flex;align-items:flex-start';
+  wrap.appendChild(grid);
+
+  /* left: available. Sticky on a laptop so it stays put while the
+     right side scrolls; on a phone the order flips, because there you
+     are reading far more often than bidding. */
+  var left = el('div', 'po-left');
+  left.style.cssText = 'width:272px;flex-shrink:0;background:' + PO_PANEL
+    + ';border-right:1px solid #383838;position:sticky;top:0;align-self:flex-start';
+  grid.appendChild(left);
+  portalAvailable_(left, host);
+
+  var right = el('div', 'po-right');
+  right.style.cssText = 'flex:1;min-width:0';
+  grid.appendChild(right);
+
+  right.appendChild(portalDoneDeal_());
+  right.appendChild(portalBoard_());
+  right.appendChild(portalFeed_(host));
+}
+
+/* Built from the register, so it says what actually happened rather
+   than anything invented. */
+function portalTicker_(){
+  var reg = (DATA.register || []).filter(function(r){ return r.action === 'SIGN'; });
+  if (!reg.length) return el('span');
+
+  var bits = reg.slice(-8).reverse().map(function(r){
+    return r.player + ' to ' + r.manager + ', ' + money_(r.fee);
+  });
+  var text = bits.join('  \u2022  ') + '  \u2022  ';
+
+  var bar = el('div');
+  bar.style.cssText = 'background:' + PO_YELLOW + ';display:flex;align-items:stretch;'
+    + 'height:36px;overflow:hidden';
+
+  var tag = el('div', null, 'BREAKING');
+  tag.style.cssText = 'background:' + PO_DARK + ';color:' + PO_YELLOW + ';font-size:11px;'
+    + 'font-weight:900;letter-spacing:1.4px;display:flex;align-items:center;'
+    + 'padding:0 14px;flex-shrink:0';
+  bar.appendChild(tag);
+
+  var mask = el('div');
+  mask.style.cssText = 'flex:1;overflow:hidden;display:flex;align-items:center';
+  var track = el('div', 'po-track');
+  /* two identical copies and one transform - the standard pattern.
+     The absolute-positioning versions are what used to fight the
+     layout, so there is none here. */
+  [0,1].forEach(function(){
+    var sp = el('span', null, text);
+    sp.style.cssText = 'font-size:12px;font-weight:800;color:' + PO_DARK
+      + ';white-space:nowrap;padding-right:44px';
+    track.appendChild(sp);
+  });
+  mask.appendChild(track);
+  bar.appendChild(mask);
+  return bar;
+}
+
+function portalAvailable_(host, page){
+  var pad = el('div');
+  pad.style.cssText = 'padding:14px 15px 10px';
+
+  var avail = availablePlayers_();
+
+  var h = el('div');
+  h.style.cssText = 'font-size:11px;font-weight:900;letter-spacing:1.3px;color:' + PO_YELLOW;
+  h.appendChild(cell_('AVAILABLE'));
+  h.appendChild(cell_('  \u00b7  ' + avail.length, 'color:#6b6b6b;font-weight:700'));
+  pad.appendChild(h);
+
+  var box = el('div');
+  box.style.cssText = 'border:1px solid #3d3d3d;padding:7px 10px;margin-top:10px';
+  var inp = document.createElement('input');
+  inp.placeholder = 'Search player or club';
+  inp.value = PO_Q;
+  inp.style.cssText = 'border:none;outline:none;background:transparent;font-family:inherit;'
+    + 'font-size:11px;color:#fff;width:100%';
+  box.appendChild(inp);
+  pad.appendChild(box);
+
+  var pills = el('div');
+  pills.style.cssText = 'display:flex;gap:3px;margin-top:8px;flex-wrap:wrap';
+  ['ALL','GK','DEF','MID','FWD'].forEach(function(v){
+    var on = PO_POS === v;
+    var b = el('button', null, v);
+    b.style.cssText = 'font:inherit;font-size:9px;font-weight:800;padding:5px 8px;cursor:pointer;'
+      + 'border:1px solid ' + (on ? PO_YELLOW : '#3d3d3d') + ';background:'
+      + (on ? PO_YELLOW : 'transparent') + ';color:' + (on ? PO_DARK : '#8a8a8a');
+    b.addEventListener('click', function(){ PO_POS = v; paint(); });
+    pills.appendChild(b);
+  });
+  pad.appendChild(pills);
+  host.appendChild(pad);
+
+  var list = el('div');
+  list.style.cssText = 'padding:0 15px 16px';
+  host.appendChild(list);
+
+  function paint(){
     clear(list);
-    var avail = DATA.players.filter(function(p){
-      if (p.team) return false;
-      if (poPos !== 'ALL' && p.pos !== poPos) return false;
-      if (poQ && (p.web + ' ' + p.club).toLowerCase().indexOf(poQ) < 0) return false;
+    var q = PO_Q;
+    var rows = avail.filter(function(p){
+      if (PO_POS !== 'ALL' && p.pos !== PO_POS) return false;
+      if (q && (p.web + ' ' + p.club).toLowerCase().indexOf(q) < 0) return false;
       return true;
-    }).sort(function(a,b){ return b.pts - a.pts; }).slice(0, 40);
+    });
 
-    if (!avail.length){
-      var n2 = el('div', null, 'No players match');
-      n2.style.cssText = 'padding:20px 0;text-align:center;color:#6b6b6b;font-size:11px';
-      list.appendChild(n2); return;
+    if (!rows.length){
+      var n = el('div', null, 'No players match');
+      n.style.cssText = 'padding:22px 0;text-align:center;color:#6b6b6b;font-size:11px';
+      list.appendChild(n);
+      return;
     }
-    avail.forEach(function(p){
-      var row = el('div','po-p');
-      row.appendChild(playerPhoto(p.id, p.web, 22));
-      var mid2 = el('span'); mid2.style.cssText = 'flex:1;min-width:0';
-      var n1 = el('span', null, p.web);
-      n1.style.cssText = 'display:block;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-      var n2b = el('span');
-      n2b.style.cssText = 'display:block;font-size:9px;color:#7a7a7a;margin-top:1px';
-      var pcol = { GK:'#5b8def', DEF:'#4CAF50', MID:'#E8B84B', FWD:'#E85C6A' }[p.pos] || '#8a8a8a';
-      var ps = el('span', null, p.pos); ps.style.cssText = 'color:' + pcol + ';font-weight:700';
-      n2b.appendChild(ps); n2b.appendChild(document.createTextNode(' - ' + p.club));
-      mid2.appendChild(n1); mid2.appendChild(n2b);
-      row.appendChild(mid2);
-      var r2 = el('span'); r2.style.cssText = 'text-align:right;flex-shrink:0';
-      var pv = el('span', null, String(p.pts));
-      pv.style.cssText = 'display:block;font-size:12px;font-weight:800;color:#FFDF00';
-      r2.appendChild(pv);
-      row.appendChild(r2);
+
+    rows.slice(0, 60).forEach(function(p){
+      var row = el('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 0;'
+        + 'border-bottom:1px solid #303030';
+      var ph = playerPhoto(p.id, p.web, 28);
+      ph.style.flexShrink = '0';
+      row.appendChild(ph);
+
+      var t = el('span');
+      t.style.cssText = 'flex:1;min-width:0';
+      t.appendChild(cell_(p.web,
+        'display:block;font-size:13px;font-weight:800;color:#fff;white-space:nowrap;'
+        + 'overflow:hidden;text-overflow:ellipsis'));
+      var meta = el('span');
+      meta.style.cssText = 'display:block;font-size:9px;color:#7a7a7a;margin-top:1px';
+      meta.appendChild(cell_(p.pos,
+        'color:' + (PO_POSCOL[p.pos] || '#7a7a7a') + ';font-weight:800'));
+      meta.appendChild(cell_('  \u00b7  ' + p.club));
+      t.appendChild(meta);
+      row.appendChild(t);
+
+      row.appendChild(cell_(String(p.pts),
+        'font-size:14px;font-weight:900;color:' + PO_YELLOW + ';flex-shrink:0'));
       list.appendChild(row);
     });
+
+    if (rows.length > 60){
+      var more = el('div', null, rows.length - 60 + ' more - narrow the search');
+      more.style.cssText = 'padding:12px 0;text-align:center;color:#6b6b6b;font-size:10px';
+      list.appendChild(more);
+    }
   }
 
-  /* squad board */
-  var LIM = [['GK',2],['DEF',5],['MID',5],['FWD',3]];
-  var owners = {};
-  Object.keys(CONFIG.managers).forEach(function(m){ owners[m] = { GK:0, DEF:0, MID:0, FWD:0, spend:0, n:0 }; });
-  DATA.players.forEach(function(p){
-    if (!p.team || !owners[p.team]) return;
-    if (owners[p.team][p.pos] !== undefined) owners[p.team][p.pos]++;
-    owners[p.team].spend += p.fee;
-    owners[p.team].n++;
-  });
-
-  var bh = el('div','po-bh');
-  [['TEAM',62],['GK',26],['DEF',56],['MID',56],['FWD',36],['REMAINING','flex'],['SQUAD',34]].forEach(function(c){
-    var sp = el('span', null, c[0]);
-    if (c[1] === 'flex') { sp.style.flex = '1'; sp.style.textAlign = 'right'; }
-    else { sp.style.width = c[1] + 'px'; if (c[0] !== 'TEAM') sp.style.textAlign = 'center'; }
-    bh.appendChild(sp);
-  });
-  board.appendChild(bh);
-
-  Object.keys(owners).sort(function(a,b){ return (100-owners[b].spend) - (100-owners[a].spend); }).forEach(function(m){
-    var o = owners[m], rem = 100 - o.spend, done = o.n >= 15;
-    var row = el('div','po-br');
-    if (done) row.style.opacity = '.62';
-    var nmw = el('span'); nmw.style.cssText = 'width:62px;display:flex;align-items:center;gap:6px';
-    var dot = el('span');
-    var kit = CONFIG.managers[m];
-    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (kit ? kit.body : '#888');
-    var nm = el('span', null, m);
-    nm.style.cssText = 'font-size:11px;font-weight:700;color:#e8e8e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-    nmw.appendChild(dot); nmw.appendChild(nm);
-    row.appendChild(nmw);
-    LIM.forEach(function(L, li){
-      var w = [26,56,56,36][li];
-      var cell = el('span'); cell.style.cssText = 'width:' + w + 'px;text-align:center';
-      var pip = el('span','po-pip');
-      for (var k = 0; k < L[1]; k++){
-        var i2 = el('i');
-        i2.style.background = k < o[L[0]] ? '#4CAF50' : 'transparent';
-        i2.style.border = k < o[L[0]] ? 'none' : '1px solid #545454';
-        pip.appendChild(i2);
-      }
-      cell.appendChild(pip);
-      row.appendChild(cell);
-    });
-    var rm = el('span', null, rem.toFixed(1) + 'm');
-    rm.style.cssText = 'flex:1;text-align:right;font-size:12px;font-weight:800;color:'
-      + (rem < 3 ? '#E85C6A' : rem < 10 ? '#F5A800' : '#4CAF50');
-    row.appendChild(rm);
-    var sq = el('span', null, o.n + '/15');
-    sq.style.cssText = 'width:34px;text-align:right;font-size:10px;font-weight:800;color:' + (done ? '#4CAF50' : '#8a8a8a');
-    row.appendChild(sq);
-    board.appendChild(row);
-  });
-
-  /* biggest fees */
-  var signed = DATA.players.filter(function(p){ return p.team && p.fee; })
-    .sort(function(a,b){ return b.fee - a.fee; }).slice(0, 10);
-  if (!signed.length){
-    var nf = el('div', null, 'No signings recorded in the Transfer Player List.');
-    nf.style.cssText = 'padding:16px 0;color:#6b6b6b;font-size:11px;font-style:italic';
-    feed.appendChild(nf);
-  }
-  signed.forEach(function(p, i){
-    var row = el('div','po-fd');
-    var n1 = el('span', null, String(i+1));
-    n1.style.cssText = 'width:24px;font-size:13px;font-weight:900;color:' + (i < 3 ? '#FFDF00' : '#5a5a5a');
-    row.appendChild(n1);
-    row.appendChild(playerPhoto(p.id, p.web, 22));
-    var mid3 = el('span'); mid3.style.cssText = 'flex:1;min-width:0';
-    var a1 = el('span', null, p.web);
-    a1.style.cssText = 'display:block;font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-    var a2 = el('span', null, p.club);
-    a2.style.cssText = 'display:block;font-size:9px;color:#7a7a7a';
-    mid3.appendChild(a1); mid3.appendChild(a2);
-    row.appendChild(mid3);
-    var ow = el('span'); ow.style.cssText = 'display:flex;align-items:center;gap:5px;flex-shrink:0';
-    var od = el('span');
-    var kit2 = CONFIG.managers[p.team];
-    od.style.cssText = 'width:7px;height:7px;border-radius:50%;background:' + (kit2 ? kit2.body : '#888');
-    var on = el('span', null, p.team);
-    on.style.cssText = 'font-size:11px;font-weight:700;color:#d8d8d8;white-space:nowrap';
-    ow.appendChild(od); ow.appendChild(on);
-    row.appendChild(ow);
-    var fe = el('span', null, p.fee.toFixed(1) + 'm');
-    fe.style.cssText = 'width:54px;text-align:right;font-size:12px;font-weight:800;color:#FFDF00';
-    row.appendChild(fe);
-    feed.appendChild(row);
-  });
-
-  pills.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-p]'); if (!b) return;
-    pills.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
-    b.classList.add('on'); poPos = b.getAttribute('data-p'); paintList();
-  });
-  inp.addEventListener('input', function(){ poQ = inp.value.toLowerCase(); paintList(); });
-  paintList();
+  inp.addEventListener('input', function(){ PO_Q = inp.value.toLowerCase(); paint(); });
+  paint();
 }
+
+/* Unowned in the draft league. The Transfer Player List carries the
+   owner, so an empty owner is a free agent. */
+function availablePlayers_(){
+  return (DATA.players || []).filter(function(p){ return !p.team; })
+    .sort(function(a,b){ return b.pts - a.pts; });
+}
+
+function portalDoneDeal_(){
+  var reg = (DATA.register || []).filter(function(r){ return r.action === 'SIGN'; });
+  var pad = el('div');
+  pad.style.cssText = 'padding:15px 17px 14px;border-bottom:1px solid #333';
+
+  if (!reg.length){
+    pad.appendChild(cell_('NOTHING SIGNED YET',
+      'display:block;font-size:9px;font-weight:900;letter-spacing:1.2px;background:'
+      + PO_YELLOW + ';color:' + PO_DARK + ';padding:4px 8px;align-self:flex-start'));
+    var n = el('div', null, txt('empty.portal',
+      'The first signing appears here the moment it is entered in the draft tool.'));
+    n.style.cssText = 'margin-top:11px;font-size:13px;color:#9a9a9a;line-height:1.5';
+    pad.appendChild(n);
+    return pad;
+  }
+
+  var last = reg[reg.length - 1];
+  var pool = DATA.players || [];
+  var p = null;
+  pool.forEach(function(x){ if (String(x.id) === String(last.elementId)) p = x; });
+  var kit = kitFor(last.manager);
+
+  var tag = el('div');
+  tag.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:11px';
+  tag.appendChild(cell_('DONE DEAL',
+    'font-size:9px;font-weight:900;letter-spacing:1.2px;background:' + PO_YELLOW
+    + ';color:' + PO_DARK + ';padding:4px 8px'));
+  tag.appendChild(cell_(ago_(last.ts), 'font-size:10px;color:#8a8a8a'));
+  pad.appendChild(tag);
+
+  var row = el('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+
+  var ph = playerPhoto(last.elementId, last.player, 58);
+  ph.style.cssText += ';flex-shrink:0;border:2px solid rgba(255,255,255,.25)';
+  row.appendChild(ph);
+
+  var who = el('div');
+  who.style.cssText = 'flex:1;min-width:120px';
+  who.appendChild(cell_(last.player,
+    'display:block;font-size:25px;font-weight:900;color:#fff;letter-spacing:-.7px;line-height:1.05'));
+  who.appendChild(cell_(p ? p.pos + '  \u00b7  ' + p.club + '  \u00b7  ' + p.pts + ' pts' : '',
+    'display:block;font-size:11px;color:#9a9a9a;margin-top:3px'));
+  row.appendChild(who);
+
+  var to = el('div');
+  to.style.cssText = 'display:flex;align-items:center;gap:11px;flex-shrink:0';
+  var av = el('span');
+  av.style.cssText = 'width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+    + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;align-items:center;'
+    + 'justify-content:center;font-size:13px;font-weight:900';
+  av.appendChild(imgTry(CONFIG.img.manager(last.manager), function(){
+    av.textContent = last.manager.substring(0,2).toUpperCase();
+  }));
+  var ai = av.firstChild;
+  if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  to.appendChild(av);
+
+  var tt = el('div');
+  tt.style.cssText = 'text-align:right';
+  tt.appendChild(cell_('SIGNED BY',
+    'display:block;font-size:9px;font-weight:800;color:#6b6b6b;letter-spacing:1.1px'));
+  tt.appendChild(cell_(last.manager,
+    'display:block;font-size:16px;font-weight:900;color:#fff;margin-top:1px'));
+  tt.appendChild(cell_(money_(last.fee),
+    'display:block;font-size:20px;font-weight:900;color:' + PO_YELLOW
+    + ';letter-spacing:-.6px;margin-top:1px'));
+  to.appendChild(tt);
+  row.appendChild(to);
+
+  pad.appendChild(row);
+  return pad;
+}
+
+/* The board alternates between the slot blocks and the same thing in
+   words. Blocks are ambient; the words are what you actually want at
+   a glance, so it shows both rather than choosing.                  */
+function portalBoard_(){
+  var pad = el('div');
+  pad.style.cssText = 'padding:14px 17px 8px';
+
+  var head = el('div');
+  head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;'
+    + 'margin-bottom:11px;gap:10px;flex-wrap:wrap';
+  head.appendChild(cell_('SQUAD BOARD',
+    'font-size:11px;font-weight:900;letter-spacing:1.3px;color:' + PO_YELLOW));
+
+  var right = el('div');
+  right.style.cssText = 'display:flex;align-items:center;gap:10px';
+  var leg = el('div');
+  leg.style.cssText = 'display:flex;gap:11px;font-size:9px;font-weight:700;color:#6b6b6b';
+  right.appendChild(leg);
+  var dots = el('div');
+  dots.style.cssText = 'display:flex;gap:4px';
+  right.appendChild(dots);
+  head.appendChild(right);
+  pad.appendChild(head);
+
+  var cols = el('div');
+  cols.style.cssText = 'display:flex;align-items:center;gap:9px;padding-bottom:8px;'
+    + 'border-bottom:1px solid #333;font-size:8px;font-weight:800;letter-spacing:.9px;color:#6b6b6b';
+  pad.appendChild(cols);
+
+  var body = el('div');
+  pad.appendChild(body);
+
+  var rows = boardRows_();
+  var lims = CONFIG.squad ? CONFIG.squad.limits : { GK:2, DEF:5, MID:5, FWD:3 };
+  var order = ['GK','DEF','MID','FWD'];
+
+  function draw(){
+    clear(leg); clear(cols); clear(body); clear(dots);
+
+    if (PO_BOARD === 0){
+      ['SIGNED','#4CAF50','NEEDED',''].length;
+      var l1 = el('span');
+      l1.style.cssText = 'display:flex;align-items:center;gap:4px';
+      var sw = el('span'); sw.style.cssText = 'width:9px;height:9px;background:#4CAF50';
+      l1.appendChild(sw); l1.appendChild(cell_('SIGNED'));
+      var l2 = el('span');
+      l2.style.cssText = 'display:flex;align-items:center;gap:4px';
+      var sw2 = el('span'); sw2.style.cssText = 'width:9px;height:9px;border:1px solid #4a4a4a';
+      l2.appendChild(sw2); l2.appendChild(cell_('NEEDED'));
+      leg.appendChild(l1); leg.appendChild(l2);
+
+      cols.appendChild(cell_('', 'width:34px'));
+      cols.appendChild(cell_('TEAM', 'flex:1'));
+      order.forEach(function(pos){
+        cols.appendChild(cell_(pos,
+          'width:' + ((lims[pos] || 3) * 12 + 6) + 'px;text-align:center'));
+      });
+      cols.appendChild(cell_('REMAINING', 'width:66px;text-align:right'));
+      cols.appendChild(cell_('SQUAD', 'width:44px;text-align:right'));
+    } else {
+      leg.appendChild(cell_('STILL TO SIGN'));
+      cols.appendChild(cell_('', 'width:34px'));
+      cols.appendChild(cell_('TEAM', 'width:84px'));
+      cols.appendChild(cell_('REQUIREMENTS', 'flex:1'));
+      cols.appendChild(cell_('REMAINING', 'width:66px;text-align:right'));
+      cols.appendChild(cell_('SQUAD', 'width:44px;text-align:right'));
+    }
+
+    rows.forEach(function(t){
+      var kit = kitFor(t.name);
+      var done = t.count >= (CONFIG.squad ? CONFIG.squad.size : 15);
+
+      var row = el('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:9px;height:42px;'
+        + 'border-bottom:1px solid #2b2b2b' + (done ? ';opacity:.72' : '');
+
+      var av = el('span');
+      av.style.cssText = 'width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+        + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;align-items:center;'
+        + 'justify-content:center;font-size:11px;font-weight:900';
+      av.appendChild(imgTry(CONFIG.img.manager(t.name), function(){
+        av.textContent = t.name.substring(0,2).toUpperCase();
+      }));
+      var ai = av.firstChild;
+      if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+      row.appendChild(av);
+
+      if (PO_BOARD === 0){
+        row.appendChild(cell_(t.name,
+          'flex:1;font-size:14px;font-weight:800;color:#fff;white-space:nowrap;'
+          + 'overflow:hidden;text-overflow:ellipsis'));
+        order.forEach(function(pos){
+          var cap = lims[pos] || 3, got = t.by[pos] || 0;
+          var slot = el('span');
+          slot.style.cssText = 'width:' + (cap * 12 + 6) + 'px;text-align:center;'
+            + 'display:inline-flex;gap:3px;justify-content:center';
+          for (var k = 0; k < cap; k++){
+            var b = el('span');
+            b.style.cssText = 'width:9px;height:14px;box-sizing:border-box;'
+              + (k < got ? 'background:#4CAF50' : 'border:1px solid #545454');
+            slot.appendChild(b);
+          }
+          row.appendChild(slot);
+        });
+      } else {
+        row.appendChild(cell_(t.name,
+          'width:84px;font-size:14px;font-weight:800;color:#fff;white-space:nowrap'));
+        var need = [];
+        order.forEach(function(pos){
+          var cap = lims[pos] || 3, got = t.by[pos] || 0;
+          if (got < cap) need.push((cap - got) + ' ' + pos);
+        });
+        row.appendChild(cell_(done ? 'Squad complete' : need.join('  \u00b7  '),
+          'flex:1;font-size:12px;font-weight:700;color:' + (done ? '#4CAF50' : '#F5A800')
+          + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis'));
+      }
+
+      row.appendChild(cell_(t.left === null ? '\u2013' : t.left.toFixed(1) + 'm',
+        'width:66px;text-align:right;font-size:15px;font-weight:900;color:' + moneyCol_(t.left)));
+      row.appendChild(cell_(t.count + '/' + (CONFIG.squad ? CONFIG.squad.size : 15),
+        'width:44px;text-align:right;font-size:12px;font-weight:800;color:'
+        + (done ? '#4CAF50' : '#8a8a8a')));
+      body.appendChild(row);
+    });
+
+    [0,1].forEach(function(i){
+      var d = el('span');
+      d.style.cssText = 'width:16px;height:3px;cursor:pointer;background:'
+        + (i === PO_BOARD ? PO_YELLOW : '#4a4a4a');
+      d.addEventListener('click', function(){
+        PO_BOARD = i;
+        if (PO_BOARD_TIMER) { clearInterval(PO_BOARD_TIMER); PO_BOARD_TIMER = null; }
+        draw();
+      });
+      dots.appendChild(d);
+    });
+  }
+
+  draw();
+  PO_BOARD_TIMER = setInterval(function(){
+    PO_BOARD = (PO_BOARD + 1) % 2;
+    draw();
+  }, 5000);
+
+  return pad;
+}
+
+/* Money left and slots filled, per manager, out of the Squads sheet -
+   which already knows the fees, the positions and the budget. */
+function boardRows_(){
+  var d = DATA.byLeague[CONFIG.leagues[0].key];
+  var squads = d && d.squads;
+  var budget = CONFIG.squad ? CONFIG.squad.budget : 100;
+
+  return draftManagers_().map(function(n){
+    var mine = squads && squads.byManager[n];
+    var by = { GK:0, DEF:0, MID:0, FWD:0 };
+    var count = 0, spent = 0;
+    if (mine){
+      mine.players.forEach(function(p){
+        if (by[p.pos] !== undefined) by[p.pos]++;
+        count++;
+        if (p.fee !== null) spent += p.fee;
+      });
+    }
+    return { name: n, by: by, count: count,
+             left: Math.round((budget - spent) * 10) / 10 };
+  }).sort(function(a,b){ return a.left - b.left || a.name.localeCompare(b.name); });
+}
+
+function moneyCol_(v){
+  if (v === null) return '#8a8a8a';
+  return v < 3 ? '#E85C6A' : v < 10 ? '#F5A800' : '#4CAF50';
+}
+
+function money_(v){
+  return '\u00a3' + (Math.round(num(v) * 10) / 10).toFixed(1) + 'm';
+}
+
+function ago_(ts){
+  if (!ts) return '';
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  var mins = Math.round((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' minute' + (mins === 1 ? '' : 's') + ' ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ' + (mins % 60) + 'm ago';
+  return d.toISOString().slice(0, 10);
+}
+
+/* Latest, or biggest fees. A manual toggle rather than a rotation -
+   the board rotates because it is ambient, but you come to the feed
+   deliberately and it should not move under you. */
+function portalFeed_(host){
+  var pad = el('div');
+  pad.style.cssText = 'padding:12px 17px 22px';
+
+  var head = el('div');
+  head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;'
+    + 'margin-bottom:10px;gap:10px;flex-wrap:wrap';
+  var title = el('div');
+  title.style.cssText = 'font-size:11px;font-weight:900;letter-spacing:1.3px;color:' + PO_YELLOW;
+  head.appendChild(title);
+
+  var btns = el('div');
+  btns.style.cssText = 'display:flex;gap:3px';
+  head.appendChild(btns);
+  pad.appendChild(head);
+
+  var body = el('div');
+  pad.appendChild(body);
+
+  var reg = (DATA.register || []).filter(function(r){ return r.action === 'SIGN'; });
+  var pool = {};
+  (DATA.players || []).forEach(function(p){ pool[String(p.id)] = p; });
+
+  function draw(){
+    title.textContent = PO_FEED === 0 ? 'LATEST' : 'BIGGEST FEES';
+    clear(btns); clear(body);
+
+    ['LATEST','BIGGEST'].forEach(function(l, i){
+      var on = PO_FEED === i;
+      var b = el('button', null, l);
+      b.style.cssText = 'font:inherit;font-size:9px;font-weight:800;letter-spacing:.7px;'
+        + 'padding:5px 10px;cursor:pointer;border:1px solid ' + (on ? PO_YELLOW : '#3d3d3d')
+        + ';background:' + (on ? PO_YELLOW : 'transparent')
+        + ';color:' + (on ? PO_DARK : '#8a8a8a');
+      b.addEventListener('click', function(){ PO_FEED = i; draw(); });
+      btns.appendChild(b);
+    });
+
+    if (!reg.length){
+      var n = el('div', null, 'Nothing signed yet.');
+      n.style.cssText = 'padding:18px 0;color:#6b6b6b;font-size:12px';
+      body.appendChild(n);
+      return;
+    }
+
+    var list = reg.slice();
+    if (PO_FEED === 0) list.reverse();
+    else list.sort(function(a,b){ return num(b.fee) - num(a.fee); });
+
+    list.slice(0, 12).forEach(function(r, i){
+      var kit = kitFor(r.manager);
+      var p = pool[String(r.elementId)];
+
+      var row = el('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;height:40px;'
+        + 'border-bottom:1px solid #2b2b2b';
+
+      row.appendChild(cell_(PO_FEED === 0 ? ago_(r.ts).replace(' ago','') : String(i + 1),
+        'width:46px;flex-shrink:0;font-size:' + (PO_FEED === 0 ? '10px' : '15px')
+        + ';font-weight:' + (PO_FEED === 0 ? '700' : '900') + ';color:'
+        + (PO_FEED === 1 && i < 3 ? PO_YELLOW : PO_FEED === 0 ? '#6b6b6b' : '#5a5a5a')
+        + ';letter-spacing:-.4px'));
+
+      var ph = playerPhoto(r.elementId, r.player, 30);
+      ph.style.flexShrink = '0';
+      row.appendChild(ph);
+
+      var t = el('span');
+      t.style.cssText = 'flex:1;min-width:0';
+      t.appendChild(cell_(r.player,
+        'display:block;font-size:13px;font-weight:800;color:#fff;white-space:nowrap;'
+        + 'overflow:hidden;text-overflow:ellipsis'));
+      t.appendChild(cell_(p ? p.club + '  \u00b7  ' + p.pts + ' pts' : '',
+        'display:block;font-size:9px;color:#7a7a7a'));
+      row.appendChild(t);
+
+      var to = el('span');
+      to.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0';
+      var av = el('span');
+      av.style.cssText = 'width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+        + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;align-items:center;'
+        + 'justify-content:center;font-size:8px;font-weight:900';
+      av.appendChild(imgTry(CONFIG.img.manager(r.manager), function(){
+        av.textContent = r.manager.substring(0,2).toUpperCase();
+      }));
+      var ai = av.firstChild;
+      if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+      to.appendChild(av);
+      to.appendChild(cell_(r.manager,
+        'font-size:12px;font-weight:800;color:#d8d8d8;white-space:nowrap'));
+      row.appendChild(to);
+
+      row.appendChild(cell_(money_(r.fee),
+        'width:60px;text-align:right;flex-shrink:0;font-size:14px;font-weight:900;color:' + PO_YELLOW));
+      body.appendChild(row);
+    });
+  }
+
+  draw();
+  return pad;
+}
+
+
+/* =====================================================================
+   SQUADS
+   Every slot shown whether it is filled or not, so the empty ones are
+   the story - on the night you are watching dashes turn into names.
+   ===================================================================== */
+
+function portalSquads_(wrap){
+  var d = DATA.byLeague[CONFIG.leagues[0].key];
+  var squads = d && d.squads;
+
+  if (!squads || !squads.summary.length){
+    wrap.appendChild(portalNote_(txt('empty.squad',
+      'No squads yet. They appear once the draft has happened.')));
+    return;
+  }
+
+  var lims = CONFIG.squad ? CONFIG.squad.limits : { GK:2, DEF:5, MID:5, FWD:3 };
+  var order = ['GK','DEF','MID','FWD'];
+  var budget = CONFIG.squad ? CONFIG.squad.budget : 100;
+
+  var grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));'
+    + 'gap:10px;padding:16px';
+
+  draftManagers_().forEach(function(name){
+    var mine = squads.byManager[name];
+    var kit = kitFor(name);
+    var by = {};
+    order.forEach(function(p){ by[p] = []; });
+    var spent = 0;
+    if (mine) mine.players.forEach(function(p){
+      if (by[p.pos]) by[p.pos].push(p);
+      if (p.fee !== null) spent += p.fee;
+    });
+    var count = mine ? mine.players.length : 0;
+
+    var card = el('div');
+    card.style.cssText = 'background:' + PO_PANEL;
+
+    var head = el('div');
+    head.style.cssText = 'display:flex;align-items:center;gap:10px;padding:11px 12px;'
+      + 'background:' + kit.main + ';color:' + kit.text;
+    var av = el('span');
+    av.style.cssText = 'width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+      + 'background:rgba(255,255,255,.28);display:flex;align-items:center;'
+      + 'justify-content:center;font-size:11px;font-weight:900';
+    av.appendChild(imgTry(CONFIG.img.manager(name), function(){
+      av.textContent = name.substring(0,2).toUpperCase();
+    }));
+    var ai = av.firstChild;
+    if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    head.appendChild(av);
+    head.appendChild(cell_(name,
+      'flex:1;font-size:16px;font-weight:900;letter-spacing:-.3px'));
+    var hr = el('span');
+    hr.style.cssText = 'text-align:right';
+    hr.appendChild(cell_((Math.round((budget - spent) * 10) / 10).toFixed(1) + 'm',
+      'display:block;font-size:15px;font-weight:900;letter-spacing:-.4px'));
+    hr.appendChild(cell_(count + '/' + (CONFIG.squad ? CONFIG.squad.size : 15),
+      'display:block;font-size:8px;font-weight:800;letter-spacing:1px;opacity:.8'));
+    head.appendChild(hr);
+    card.appendChild(head);
+
+    order.forEach(function(pos){
+      var cap = lims[pos] || 3, got = by[pos];
+      var sub = 0;
+      got.forEach(function(p){ if (p.fee !== null) sub += p.fee; });
+
+      var ph = el('div');
+      ph.style.cssText = 'display:flex;align-items:center;gap:7px;padding:8px 12px 4px';
+      ph.appendChild(cell_(pos,
+        'font-size:9px;font-weight:900;letter-spacing:1.2px;width:26px;color:'
+        + (PO_POSCOL[pos] || '#8a8a8a')));
+      ph.appendChild(cell_(got.length + '/' + cap,
+        'font-size:9px;font-weight:700;color:' + (got.length === cap ? '#4CAF50' : '#6b6b6b')));
+      var ln = el('span'); ln.style.cssText = 'flex:1;height:1px;background:#333';
+      ph.appendChild(ln);
+      ph.appendChild(cell_(sub ? sub.toFixed(1) + 'm' : '',
+        'font-size:10px;font-weight:800;color:#6b6b6b'));
+      card.appendChild(ph);
+
+      for (var i = 0; i < cap; i++){
+        var p = got[i];
+        var row = el('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 12px'
+          + (p ? '' : ';opacity:.4');
+
+        if (p){
+          var pp = playerPhoto(null, p.name, 20);
+          pp.style.flexShrink = '0';
+          row.appendChild(pp);
+        } else {
+          var dot = el('span');
+          dot.style.cssText = 'width:20px;height:20px;border-radius:50%;flex-shrink:0;'
+            + 'border:1px dashed #4a4a4a';
+          row.appendChild(dot);
+        }
+
+        row.appendChild(cell_(p ? p.name : '\u2013',
+          'flex:1;min-width:0;font-size:12px;font-weight:' + (p ? '700' : '500')
+          + ';color:' + (p ? '#fff' : '#5a5a5a')
+          + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis'));
+        row.appendChild(cell_(p ? p.club : '',
+          'width:34px;font-size:10px;font-weight:700;color:#7a7a7a;flex-shrink:0'));
+        row.appendChild(cell_(p && p.fee !== null ? p.fee.toFixed(1) + 'm' : '',
+          'width:44px;text-align:right;font-size:12px;font-weight:800;color:#d8d8d8;flex-shrink:0'));
+        card.appendChild(row);
+      }
+    });
+
+    var tot = el('div');
+    tot.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 12px;'
+      + 'margin-top:6px;border-top:2px solid ' + PO_YELLOW;
+    tot.appendChild(cell_('TOTAL',
+      'flex:1;font-size:12px;font-weight:900;letter-spacing:1.3px;color:' + PO_YELLOW));
+    tot.appendChild(cell_('', 'width:34px'));
+    tot.appendChild(cell_(money_(spent),
+      'width:44px;text-align:right;font-size:15px;font-weight:900;color:' + PO_YELLOW));
+    card.appendChild(tot);
+
+    grid.appendChild(card);
+  });
+
+  wrap.appendChild(grid);
+}
+
+
+/* =====================================================================
+   AUDIT LEAGUE
+   A shell until RAW_Transactions exists. The FPL Draft API has an
+   endpoint that gives every waiver and free agent move with both
+   sides, the gameweek and whether it went through - which is exactly
+   this page. Until that is pulled into the workbook there is nothing
+   honest to show, so it says so.
+   ===================================================================== */
+
+function portalAudit_(wrap){
+  wrap.appendChild(portalNote_('Weekly moves appear here once the transactions pull is '
+    + 'added to the workbook. The Audit League trades through FPL rather than a draft, '
+    + 'so there are no fees and no budget - just who picked up whom, and when.'));
+}
+
+function portalNote_(text){
+  var n = el('div');
+  n.style.cssText = 'margin:18px;padding:18px 20px;background:' + PO_PANEL
+    + ';border-left:3px solid ' + PO_YELLOW + ';font-size:13px;line-height:1.6;'
+    + 'color:#b8b8b8;max-width:640px';
+  n.textContent = text;
+  return n;
+}
+
 
 /* =====================================================================
    START
