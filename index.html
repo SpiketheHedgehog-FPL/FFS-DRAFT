@@ -470,6 +470,9 @@ var CONFIG = {
      the league would have shown a LEADER at GW38 and never crowned
      anybody. Silent, and only wrong on the last day. */
   totalGameweeks: 38,
+  /* the draft rules, so the pages can say what a full squad is and
+     what everybody started with */
+  squad: { budget: 100, size: 15, limits: { GK:2, DEF:5, MID:5, FWD:3 } },
   /* '26/27' as the honours images are named: 2627 */
   seasonCode: '2627',
   sheetBase: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzpbuaeYd1DzKkJszapnpA-iCmm_YPQmHuNxfYMhdMUGOjDtwuUsQFlqHEDpuQmpbr7aufi1UjhvQJ/pub?single=true&output=csv&gid=',
@@ -1742,7 +1745,7 @@ function parsePlayerStats(rows){
   var idx = {};
   head.forEach(function(h, i){ if (h) idx[h] = i; });
 
-  var byId = {}, byName = {}, ambiguous = {};
+  var byId = {}, byCode = {}, byName = {}, ambiguous = {};
   rows.slice(1).forEach(function(r){
     function g(name){
       var i = idx[name];
@@ -1753,10 +1756,13 @@ function parsePlayerStats(rows){
     var web = String(g('web name') || g('web_name') || '').trim();
     if (!id && !web) return;
 
-    var rec = { id: id, web: web,
+    var code = String(g('code') || '').trim();
+
+    var rec = { id: id, code: code, web: web,
       pos: normPos_(g('position') || g('element_type') || ''),
       club: String(g('club') || '').trim(), get: g };
     if (id) byId[id] = rec;
+    if (code) byCode[code] = rec;
     var k = web.toLowerCase();
     if (k){
       if (byName[k] && byName[k].id !== id) ambiguous[k] = true;
@@ -1765,7 +1771,7 @@ function parsePlayerStats(rows){
   });
 
   Object.keys(ambiguous).forEach(function(k){ delete byName[k]; });
-  return { byId: byId, byName: byName, cols: idx };
+  return { byId: byId, byCode: byCode, byName: byName, cols: idx };
 }
 
 function parseClubs(rows){
@@ -2298,7 +2304,9 @@ function homeHero_(played){
    Four zeros and "BEST GW -" is not a summary of anything. Before the
    season starts these carry the numbers that do exist. */
 function homeTiles_(played){
-  var bar = el('div','stats');
+  /* 'stats' had no styles at all, so the bar rendered as four
+     stacked lines of unstyled text. The class is 'tiles'. */
+  var bar = el('div','tiles');
   var vals;
 
   if (!played){
@@ -5380,7 +5388,10 @@ function paintSupercopa(host){
   }
 
   var grid = el('div');
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));'
+  /* two by two, not auto-fit. On a wide screen auto-fit put three
+     groups in the first row and one orphan underneath, which is not
+     how a four group draw reads. */
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));'
     + 'gap:12px;padding:16px';
   Object.keys(groups).sort().forEach(function(letter){
     var teams = groups[letter];
@@ -5750,6 +5761,27 @@ function holderFor_(row, compLabel, leagueName){
   return null;
 }
 
+/* Which season's artwork to show for a trophy. This season if it
+   exists, otherwise the most recent one that does.
+
+   The list comes from USER_CHAMPIONS, so it only ever looks for
+   seasons you have actually recorded rather than guessing backwards
+   through years that never happened.                                */
+function seasonWithArt_(imgKey){
+  var now = CONFIG.seasonCode;
+  var seasons = (DATA.champions || []).map(function(r){
+    return String(r.season || '').replace(/\D/g, '');
+  }).filter(Boolean);
+
+  if (seasons.indexOf(now) >= 0 || !seasons.length){
+    return { season: now, old: false, label: '' };
+  }
+  /* newest first, and USER_CHAMPIONS is already sorted that way */
+  var prev = seasons[0];
+  return { season: prev, old: true,
+           label: prev.slice(0,2) + '/' + prev.slice(2) };
+}
+
 function holderCard_(label, colour, imgKey, name){
   var pending = !name;
   var card = el('div');
@@ -5765,9 +5797,23 @@ function holderCard_(label, colour, imgKey, name){
   art.style.cssText = 'height:92px;background:#EEF2F6;display:flex;flex-direction:column;'
     + 'align-items:center;justify-content:center;border-bottom:0.5px solid #e3e6ea;'
     + 'font-size:8px;font-weight:700;letter-spacing:.8px;color:#a3adb7;overflow:hidden';
-  art.appendChild(imgTry(CONFIG.img.champion(imgKey, CONFIG.seasonCode), function(){
+  /* The card shows the season it has artwork for, not the season the
+     site happens to be in. Asking for 2627 in August 2026 will always
+     miss - nobody has won anything yet - so it falls back to the most
+     recent season that does have a picture and says which.
+
+     Otherwise the page reads as broken when it is simply early. */
+  var art2 = seasonWithArt_(imgKey);
+  art.appendChild(imgTry(CONFIG.img.champion(imgKey, art2.season), function(){
     art.textContent = 'CHAMPION ARTWORK';
   }));
+  if (art2.old){
+    var tag = el('div', null, art2.label);
+    tag.style.cssText = 'position:absolute;left:0;bottom:0;background:rgba(12,35,64,.72);'
+      + 'color:#fff;font-size:8px;font-weight:800;letter-spacing:1.1px;padding:3px 7px';
+    art.style.position = 'relative';
+    art.appendChild(tag);
+  }
   var ai = art.firstChild;
   if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
   card.appendChild(art);
@@ -6431,15 +6477,39 @@ function playerRecord_(id, name){
     else if (!id && name && x.web === name) live = x;
   });
 
-  var pid = live ? String(live.id) : (id ? String(id) : '');
-  var nm  = (live && live.web) || name || '';
+  var pid  = live ? String(live.id) : (id ? String(id) : '');
+  var nm   = (live && live.web) || name || '';
+  /* the code is the one thing that survives a season */
+  var code = (live && String(live.code || '')) || '';
 
+  /* MATCH ON CODE, NOT ID
+
+     FPL reassigns element ids every summer, so last season's id 12 is
+     somebody else entirely this year. Looking the archive up by id
+     returned a different player wearing the right name - Haaland came
+     back as a Newcastle defender, which is the sort of wrong that
+     looks like a data problem rather than a lookup problem.
+
+     The code is permanent. It is what the photographs are keyed on
+     too, for the same reason.                                       */
   function look(set){
     if (!set) return null;
-    return (pid && set.byId[pid]) || set.byName[String(nm).toLowerCase()] || null;
+    if (code && set.byCode && set.byCode[code]) return set.byCode[code];
+    /* the live sheet alone may be indexed by id */
+    if (set === DATA.stats && pid && set.byId[pid]) return set.byId[pid];
+    return set.byName[String(nm).toLowerCase()] || null;
   }
   var now   = look(DATA.stats);
-  var prior = look(DATA.prior);
+  /* if the live sheet knows the code and the transfer list did not,
+     use that to reach the archive */
+  if (!code && now && now.code) {
+    code = String(now.code);
+    if (DATA.prior && DATA.prior.byCode && DATA.prior.byCode[code]) {
+      /* recompute with the code now known */
+    }
+  }
+  var prior = (code && DATA.prior && DATA.prior.byCode && DATA.prior.byCode[code])
+    ? DATA.prior.byCode[code] : look(DATA.prior);
 
   if (!live && !now && !prior) return null;
 
