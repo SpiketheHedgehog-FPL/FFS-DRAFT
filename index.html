@@ -34,7 +34,10 @@ img{display:block;max-width:100%}
 .sp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
 .sp-title{font-size:10px;font-weight:800;letter-spacing:1.1px}
 .sp-rule{height:3px;width:26px;margin-bottom:11px}
-.sp-body{min-height:186px}
+/* a fixed height, not a minimum. It was growing and shrinking with
+   whichever competition it happened to be showing, so the sidebar
+   jumped every five seconds. */
+.sp-body{height:186px;overflow:hidden}
 .sp-dots{display:flex;gap:5px;margin-top:12px}
 .sp-dots span{width:16px;height:3px;background:#dde3e9;cursor:pointer}
 .sp-row{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #eef1f4;font-size:12px}
@@ -103,14 +106,23 @@ img{display:block;max-width:100%}
 .err{margin:20px;padding:14px 16px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px}
 
 /* hero */
-.hero{position:relative;height:250px;background:#123A5C;overflow:hidden}
+/* An aspect ratio, not a height. At a fixed 250px the image was
+   cropped to whatever the window happened to be, so the subject
+   drifted off the side as the browser resized. */
+.hero{position:relative;aspect-ratio:21/9;min-height:190px;max-height:340px;
+      background:linear-gradient(115deg,#0C2340 0%,#123A5C 45%,#0091DA 100%);overflow:hidden}
+.hero.no-hero{background:linear-gradient(115deg,#0C2340 0%,#123A5C 45%,#0091DA 100%)}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .hero-slot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 .hero-slot div{border:2px dashed rgba(255,255,255,.28);padding:16px 26px;text-align:center;color:rgba(255,255,255,.4);font-size:10px;font-weight:600;letter-spacing:1.2px}
-.hero-scrim{position:absolute;inset:0;background:rgba(9,28,50,.64)}
+/* dark where the words are, clear where the picture is. A flat wash
+   over the whole thing greys out the photograph to make the text
+   readable, which is a poor trade on the page people see first. */
+.hero-scrim{position:absolute;inset:0;background:linear-gradient(180deg,
+  rgba(9,28,50,0) 30%, rgba(9,28,50,.55) 62%, rgba(9,28,50,.88) 100%)}
 .hero-copy{position:absolute;left:0;right:0;bottom:0;padding:0 26px 24px}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--rsm-cyan);margin-bottom:9px}
-.hero-title{font-size:33px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1.05}
+.hero-title{font-size:clamp(22px,3.4vw,38px);font-size:33px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1.05}
 .hero-sub{font-size:13px;color:rgba(255,255,255,.75);line-height:1.5;margin:10px 0 16px;max-width:430px}
 .hero-cta{background:var(--rsm-azure);display:inline-block;padding:10px 18px;font-size:12px;font-weight:700;color:#fff;cursor:pointer}
 
@@ -139,7 +151,7 @@ img{display:block;max-width:100%}
 .lt-mast .bands{position:absolute;inset:0}
 .lt-mast .bands i{position:absolute;top:-40px;bottom:-40px;display:block;transform:skewX(-24deg)}
 .lt-mast .copy{position:relative;height:100%;display:flex;align-items:center;gap:15px;padding-left:24px}
-.lt-slot{width:46px;height:46px;border:1px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:8px;font-weight:700;letter-spacing:.8px;color:rgba(255,255,255,.7);overflow:hidden}
+.lt-slot{width:76px;height:76px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:700;letter-spacing:.8px;color:rgba(255,255,255,.7);overflow:hidden}
 .lt-slot img{width:100%;height:100%;object-fit:contain}
 .lt-mast h1{font-size:31px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1}
 .lt-mast p{font-size:9px;font-weight:800;letter-spacing:1.8px;color:rgba(255,255,255,.8);margin-top:4px}
@@ -148,7 +160,19 @@ img{display:block;max-width:100%}
 .scrub{padding:13px 24px;display:flex;align-items:center;gap:11px}
 .scrub .btn{width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .scrub .btn svg{width:11px;height:11px;fill:#fff}
-.scrub input{flex:1}
+/* The track carries the same ten colour ramp as the masthead above
+   it, so dragging through the season runs along the league's own
+   colours rather than a grey bar borrowed from nowhere.
+
+   Two leagues, two ramps - the gradient is set per league at paint
+   time rather than fixed here. */
+.scrub input{flex:1;-webkit-appearance:none;appearance:none;height:8px;border-radius:4px;
+  background:#e3e8ee;outline:none;cursor:pointer}
+.scrub input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;
+  border-radius:50%;background:#fff;border:3px solid var(--scrub-thumb,#8B2FD9);cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.scrub input::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;
+  border:3px solid var(--scrub-thumb,#8B2FD9);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .scrub .val{font-size:14px;font-weight:900;min-width:54px;text-align:right}
 .card{background:#fff;margin:0 20px 20px;padding:12px 16px 14px;border:1px solid var(--line)}
 .lt-head,.lt-row{display:flex;align-items:center;gap:6px}
@@ -178,7 +202,7 @@ img{display:block;max-width:100%}
   padding:13px 15px;cursor:pointer}
 .h2h-nav button.on{color:#fff;border-bottom-color:#00E5FF}
 .h2h-mast{display:flex;align-items:center;gap:13px;padding:16px 18px 14px}
-.h2h-slot{width:44px;height:44px;border:1px dashed rgba(255,255,255,.45);display:flex;align-items:center;justify-content:center;
+.h2h-slot{width:76px;height:76px;display:flex;align-items:center;justify-content:center;
   flex-shrink:0;font-size:7px;font-weight:700;letter-spacing:.7px;color:rgba(255,255,255,.5);overflow:hidden}
 .h2h-slot img{width:100%;height:100%;object-fit:contain}
 .h2h-mast h2{font-size:18px;font-weight:900;color:#fff;letter-spacing:.4px;line-height:1}
@@ -266,7 +290,7 @@ img{display:block;max-width:100%}
   font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:13px 15px;cursor:pointer}
 .cup-nav button.on{color:#fff;border-bottom-color:#fff}
 .cup-mast{position:relative;padding:20px 22px 16px;display:flex;align-items:center;gap:15px}
-.cup-slot{width:44px;height:44px;border:2px solid #fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+.cup-slot{width:76px;height:76px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
   font-size:7px;font-weight:800;color:#fff;overflow:hidden}
 .cup-slot img{width:100%;height:100%;object-fit:contain}
 .cup-mast h2{font-size:25px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1}
@@ -441,6 +465,11 @@ img{display:block;max-width:100%}
    ===================================================================== */
 var CONFIG = {
   season: '26/27',
+  /* The season length. Without this, "played >= CONFIG.totalGameweeks"
+     compared a number against undefined, which is always false - so
+     the league would have shown a LEADER at GW38 and never crowned
+     anybody. Silent, and only wrong on the last day. */
+  totalGameweeks: 38,
   /* '26/27' as the honours images are named: 2627 */
   seasonCode: '2627',
   sheetBase: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzpbuaeYd1DzKkJszapnpA-iCmm_YPQmHuNxfYMhdMUGOjDtwuUsQFlqHEDpuQmpbr7aufi1UjhvQJ/pub?single=true&output=csv&gid=',
@@ -513,6 +542,7 @@ var CONFIG = {
       ledger:        '70428418',
       fixtures:      '727393446',
       positions:     '1065222355',
+      rawPlayers:    '910048920',
       motmCalc:      '1242719057',
       text:          '669929533'
     }
@@ -548,13 +578,36 @@ var CONFIG = {
   },
   /* key doubles as the image filename, so these match the files in
      img/competitions and img/trophies exactly.                       */
+  /* Each competition's real colours, in one place, so a block on the
+     home page and the page it links to cannot disagree.
+
+     accent is the second colour where a competition has one - the
+     H2H's cyan and pink, the gold competitions' deep gold. The three
+     gold ones share a field on purpose: SuperLiga, the Supercopa and
+     the Copa are the competitions everybody plays.                 */
   comps: [
-    { key:'league',    name:'Overall league', colour:'#0091DA', meta:'GW1-38 - total points' },
-    { key:'h2h',       name:'Head to Head',   colour:'#003399', meta:'GW1-34 - final GW38' },
-    { key:'cup',       name:'Cup',            colour:'#CC0000', meta:'GW21-30 - final GW38' },
-    { key:'superliga', name:'SuperLiga',      colour:'#0B7A4B', meta:'All 22 - GW1-38' },
-    { key:'supercopa', name:'Supercopa',      colour:'#C9A227', meta:'Apertura and Clausura' }
+    { key:'league',    name:'Overall league', colour:'#0091DA', accent:'#00D4FF',
+      meta:'GW1-38 - total points' },
+    { key:'h2h',       name:'Head to Head',   colour:'#0B1340', accent:'#00E5FF',
+      accent2:'#FF3D9E', meta:'GW1-34 - final GW38' },
+    { key:'cup',       name:'Cup',            colour:'#CC0000', accent:'#FFFFFF',
+      meta:'GW21-30 - final GW38' },
+    { key:'superliga', name:'SuperLiga',      colour:'#D9AF2B', accent:'#8A6A0C',
+      meta:'All 22 - GW1-38' },
+    { key:'supercopa', name:'Supercopa',      colour:'#D9AF2B', accent:'#8A6A0C',
+      meta:'Apertura and Clausura' },
+    /* no copa badge exists in img/competitions, so it borrows the
+       Supercopa's rather than showing an empty tile */
+    { key:'copa',      name:'Copa del Campeones', colour:'#C9A227', accent:'#8A6A0C',
+      img:'supercopa', meta:'GW37 and GW38', shared:true }
   ],
+
+  /* one lookup for anywhere a competition name turns up */
+  compColour: function(key){
+    var hit = null;
+    this.comps.forEach(function(c){ if (c.key === key) hit = c; });
+    return hit || { colour:'#5A6570', accent:'#FFFFFF' };
+  },
   img: {
     hero:      'img/hero/home',
     manager:   function(name){ return 'img/managers/' + slug(name); },
@@ -570,7 +623,11 @@ var CONFIG = {
        Numbered rather than named so more can be dropped in without
        anyone having to think of a filename.                          */
     outtake:   function(n){ return 'img/outtakes/outtake-' + n; },
-    outtakeCount: 11,
+    /* No fixed count. The gallery walks upwards until it has missed
+       three in a row, so adding outtake-14 needs nothing changing
+       here - and a gap at outtake-7 does not stop it finding 8.   */
+    outtakeStopAfter: 3,
+    outtakeMax: 200,
 
     /* Tried in order until one loads. Saves converting everything to
        one format, and means a png dropped in months from now works
@@ -1642,6 +1699,87 @@ function parseRegister(rows){
   return out;
 }
 
+/* Club colours, read from USER Kits where the sheet has them and
+   falling back to the built-in list. Same bargain as the manager
+   kits - a colour and its ink, never just a colour. */
+var CLUB_COLOURS = {
+  ARS:['#EF0107','#FFFFFF'], AVL:['#95BFE5','#670E36'], BOU:['#DA291C','#FFFFFF'],
+  BRE:['#E30613','#FFFFFF'], BHA:['#0057B8','#FFFFFF'], BUR:['#6C1D45','#99D6EA'],
+  CHE:['#034694','#FFFFFF'], CRY:['#1B458F','#FFFFFF'], EVE:['#003399','#FFFFFF'],
+  FUL:['#FFFFFF','#000000'], IPS:['#3A64A3','#FFFFFF'], LEE:['#FFCD00','#1D428A'],
+  LEI:['#003090','#FDBE11'], LIV:['#C8102E','#FFFFFF'], MCI:['#6CABDD','#1C2C5B'],
+  MUN:['#DA291C','#FFFFFF'], NEW:['#241F20','#FFFFFF'], NFO:['#DD0000','#FFFFFF'],
+  SOU:['#D71920','#FFFFFF'], SUN:['#EB172B','#FFFFFF'], TOT:['#FFFFFF','#132257'],
+  WHU:['#7A263A','#1BB1E7'], WOL:['#FDB913','#231F20']
+};
+var CLUB_FALLBACK = ['#5A6570','#FFFFFF'];
+
+function clubColour(code){
+  var k = String(code || '').toUpperCase().trim();
+  var sheet = DATA.clubs && DATA.clubs[k];
+  if (sheet) return sheet;
+  var c = CLUB_COLOURS[k] || CLUB_FALLBACK;
+  return { colour: c[0], ink: c[1] };
+}
+
+/* The club rows sit on USER Kits below the managers - a short code in
+   the first column and two colours. */
+/* A full stats sheet, read by header name rather than position.
+
+   Used for both RAW_Players and the archive tabs, which carry the
+   same information under different spellings - snake_case from the
+   API, Title Case in the archive. Reading by name means one parser
+   serves both, and a column added next season shifts nothing.     */
+/* GKP and GK are the same position under two spellings. */
+function normPos_(v){
+  var t = String(v || '').toUpperCase().trim();
+  return t === 'GKP' ? 'GK' : t;
+}
+
+function parsePlayerStats(rows){
+  if (!rows || rows.length < 2) return null;
+  var head = rows[0].map(function(h){ return String(h || '').trim().toLowerCase(); });
+  var idx = {};
+  head.forEach(function(h, i){ if (h) idx[h] = i; });
+
+  var byId = {}, byName = {}, ambiguous = {};
+  rows.slice(1).forEach(function(r){
+    function g(name){
+      var i = idx[name];
+      return i === undefined ? '' : r[i];
+    }
+    var id = String(g('id') || '').trim();
+    /* the API says web_name, the archive says Web Name */
+    var web = String(g('web name') || g('web_name') || '').trim();
+    if (!id && !web) return;
+
+    var rec = { id: id, web: web,
+      pos: normPos_(g('position') || g('element_type') || ''),
+      club: String(g('club') || '').trim(), get: g };
+    if (id) byId[id] = rec;
+    var k = web.toLowerCase();
+    if (k){
+      if (byName[k] && byName[k].id !== id) ambiguous[k] = true;
+      else byName[k] = rec;
+    }
+  });
+
+  Object.keys(ambiguous).forEach(function(k){ delete byName[k]; });
+  return { byId: byId, byName: byName, cols: idx };
+}
+
+function parseClubs(rows){
+  if (!rows || !rows.length) return null;
+  var out = {};
+  rows.forEach(function(r){
+    var c = String(r[0] || '').trim().toUpperCase();
+    if (!c || c.length > 4) return;
+    var col = hex(r[1]), ink = hex(r[2]);
+    if (col) out[c] = { colour: col, ink: ink || CLUB_FALLBACK[1] };
+  });
+  return Object.keys(out).length ? out : null;
+}
+
 function parseKits(rows){
   if (!rows || !rows.length) return null;
   var out = {};
@@ -1726,7 +1864,8 @@ var LEAGUE = CONFIG.leagues[0];
 var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2hForm:null,
              players:null, codes:null, bonus:null, squads:{}, byLeague:{},
              fixtures:[], scores:{}, positions:null,
-             motm:[], champions:[], historic:[], text:null, register:[] };
+             motm:[], champions:[], historic:[], text:null, register:[],
+             clubs:null, prior:null, stats:null };
 var loaded = { home:false, league:false, h2h:false, cup:false, managers:false,
                players:false, portal:false, sliga:false, super:false, honours:false };
 var route = 'home';
@@ -1877,12 +2016,20 @@ function boot(){
 
   /* colours first - every page reads them, and a page that renders
      before they arrive would show the fallback greys and then flicker */
-  jobs.push(fetchSheet(SHARED,'kits').then(parseKits).catch(function(){ return null; })
+  jobs.push(fetchSheet(SHARED,'kits').then(function(rows){
+      DATA.clubs = parseClubs(rows);
+      return parseKits(rows);
+    }).catch(function(){ return null; })
     .then(function(k){ DATA.kits = k; }));
   jobs.push(fetchSheet(SHARED,'text').then(parseText).catch(function(){ return null; })
     .then(function(t){ DATA.text = t; }));
   jobs.push(fetchSheet(SHARED,'register').then(parseRegister).catch(function(){ return []; })
     .then(function(r){ DATA.register = r; }));
+  jobs.push(fetchSheet(SHARED,'players2526').then(parsePlayerStats).catch(function(){ return null; })
+    .then(function(x){ DATA.prior = x; }));
+  /* the full stats for this season, straight off the raw layer */
+  jobs.push(fetchSheet(SHARED,'rawPlayers').then(parsePlayerStats).catch(function(){ return null; })
+    .then(function(x){ DATA.stats = x; }));
 
   /* one sheet holds every competition's fixtures, which is what makes
      a combined record across all of them possible */
@@ -1987,121 +2134,553 @@ function boot(){
 /* =====================================================================
    HOME
    ===================================================================== */
+/* =====================================================================
+   HOME
+
+   The page most people open and never leave, so it has to be worth
+   opening on a Tuesday when nothing has happened.
+
+   Three things it now does that it did not:
+
+     - it tells the truth before the season starts. It used to say
+       "Adam S leads the way on 0 points, 0 clear" in August, which is
+       not a fact, it is a template with nothing in it.
+
+     - the competition blocks say how far each competition has
+       actually got. Only the finished one says champion.
+
+     - a tracker cycles this gameweek's fixtures through whichever
+       competitions are playing, in their own colours.
+
+   Every line of wording goes through txt(), so it can be rewritten in
+   USER_TEXT without touching this file.
+   ===================================================================== */
+
+var HOME_TRACK = 0;
+var HOME_TIMER = null;
+
 function renderHome(){
   var host = document.getElementById('p-home');
   if (loaded.home) return;
-  /* A table that loaded but holds no rows is as unusable as one that
-     did not load - the page below reads t[0] straight away. Treating
-     them the same turns a blank white screen into a sentence.
 
-     It happens for real between a reset and the rebuild that follows
-     it, and pre-season before anyone has a squad.                    */
   if (!DATA.table || !DATA.table.length) {
     clear(host);
-    var e1 = el('div','err', DATA.table
-      ? 'The league table is empty. Rebuild it from the sheet, or wait for the '
-        + 'first gameweek if the season has not started.'
-      : 'Could not load the league table sheet. Check it is still published to the web.');
-    host.appendChild(e1);
+    host.appendChild(el('div','err', DATA.table
+      ? txt('empty.table', 'The league table is empty. Rebuild it from the sheet, or wait '
+          + 'for the first gameweek if the season has not started.')
+      : txt('error.sheet', 'Could not load the league table sheet. Check it is still '
+          + 'published to the web.')));
     return;
   }
   loaded.home = true;
+  paintHome(host);
+}
+
+function paintHome(host){
   clear(host);
+  if (HOME_TIMER) { clearInterval(HOME_TIMER); HOME_TIMER = null; }
 
-  var t = DATA.table;
-  var leader = t[0];
-  var margin = t.length > 1 ? (t[0].points - t[1].points) : 0;
   var played = DATA.gw ? DATA.gw.played : 0;
-  var complete = played >= 38;
 
-  /* hero */
+  host.appendChild(homeHero_(played));
+  host.appendChild(homeTiles_(played));
+
+  var pad = el('div');
+  pad.style.cssText = 'padding:20px 24px 34px';
+  host.appendChild(pad);
+
+  var track = homeTracker_();
+  if (track) pad.appendChild(track);
+
+  pad.appendChild(homeHeading_('Competitions', 'where each one stands'));
+  pad.appendChild(homeComps_(played));
+
+  var lower = el('div');
+  lower.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));'
+    + 'gap:10px;margin-top:20px';
+  var motm = homeMotm_();
+  if (motm) lower.appendChild(motm);
+  var last = homeLastGw_(played);
+  if (last) lower.appendChild(last);
+  if (lower.children.length) pad.appendChild(lower);
+}
+
+function homeHeading_(title, sub){
+  var h = el('div');
+  h.style.cssText = 'display:flex;align-items:baseline;gap:10px;margin:0 0 11px;flex-wrap:wrap';
+  h.appendChild(cell_(title,
+    'font-size:17px;font-weight:900;color:#0C2340;letter-spacing:-.3px'));
+  if (sub) h.appendChild(cell_(sub, 'font-size:11px;color:#8a939c'));
+  return h;
+}
+
+/* ---- HERO ----
+   An aspect ratio rather than a fixed height, so the picture scales
+   with the window instead of being cropped to whatever 250px happens
+   to be at that width. The scrim is a gradient, clear at the top and
+   dark where the words are, rather than a flat wash over the whole
+   image - which was making the photograph muddy in order to make the
+   text readable. */
+function homeHero_(played){
   var hero = el('div','hero');
-  /* every file type is tried before the placeholder appears, so a png
-     hero does not get replaced by "HERO IMAGE SLOT" on the first miss */
-  var him = imgTry(CONFIG.img.hero, function(){
+
+  var im = imgTry(CONFIG.img.hero, function(){
     var slot = el('div','hero-slot');
     slot.appendChild(el('div', null, 'HERO IMAGE SLOT'));
     hero.insertBefore(slot, hero.firstChild);
   });
-  hero.appendChild(him);
-  hero.appendChild(el('div','hero-scrim'));
+  hero.appendChild(im);
+
+  var scrim = el('div','hero-scrim');
+  hero.appendChild(scrim);
 
   var copy = el('div','hero-copy');
-  copy.appendChild(el('div','hero-kicker', complete ? 'CHAMPIONS ' + CONFIG.season : 'GAMEWEEK ' + played));
-  copy.appendChild(el('div','hero-title', complete ? leader.name + ' takes the title' : leader.name + ' leads the way'));
-  var story = complete
-    ? 'Champions by ' + margin + ' points from ' + (t[1] ? t[1].name : '') + ', with ' + leader.points + ' across the season.'
-    : leader.name + ' tops the table on ' + leader.points + ' points, ' + margin + ' clear of ' + (t[1] ? t[1].name : '') + '.';
-  copy.appendChild(el('div','hero-sub', story));
-  var cta = el('div','hero-cta','View full standings');
-  cta.addEventListener('click', function(){ go('league'); });
-  copy.appendChild(cta);
+  var body = el('div');
+  body.style.cssText = 'display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap';
+
+  var text = el('div');
+  text.style.cssText = 'flex:1;min-width:200px';
+
+  if (!played){
+    /* nothing has been played, so there is no leader to name */
+    text.appendChild(el('div','hero-kicker',
+      txt('home.pre.kicker', 'DRAFT NIGHT')));
+    text.appendChild(el('div','hero-title',
+      txt('home.pre.title', 'The season starts here')));
+    text.appendChild(el('div','hero-sub',
+      txt('home.pre.sub', (DATA.players || []).length + ' players in the pool. '
+        + (CONFIG.squad ? '\u00a3' + CONFIG.squad.budget + 'm each.' : ''))));
+  } else {
+    var t = DATA.table[0];
+    var margin = DATA.table.length > 1 ? (t.points - DATA.table[1].points) : 0;
+    var complete = played >= CONFIG.totalGameweeks;
+
+    text.appendChild(el('div','hero-kicker',
+      txt('home.hero.kicker', 'GAMEWEEK') + ' ' + played + '  \u00b7  ' + LEAGUE.name.toUpperCase()));
+    text.appendChild(el('div','hero-title', t.name + ' '
+      + (complete ? txt('home.hero.champion', 'takes the title')
+                  : txt('home.hero.leading', 'leads the way'))));
+    text.appendChild(el('div','hero-sub',
+      t.points + ' points, ' + (margin ? margin + ' clear of ' + DATA.table[1].name
+        : 'level at the top') + ' after ' + played + ' gameweek'
+        + (played === 1 ? '' : 's') + '.'));
+  }
+
+  var btn = el('a','hero-btn', played
+    ? txt('home.hero.button', 'View full standings')
+    : txt('home.pre.button', 'Open the transfer portal'));
+  btn.addEventListener('click', function(){ go(played ? 'league' : 'portal'); });
+  text.appendChild(btn);
+  body.appendChild(text);
+
+  /* the leader's face, once there is one */
+  if (played){
+    var kit = kitFor(DATA.table[0].name);
+    var av = el('div');
+    av.style.cssText = 'width:74px;height:74px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+      + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;align-items:center;'
+      + 'justify-content:center;font-size:20px;font-weight:900;'
+      + 'border:3px solid rgba(255,255,255,.35)';
+    av.appendChild(imgTry(CONFIG.img.manager(DATA.table[0].name), function(){
+      av.textContent = DATA.table[0].name.substring(0,2).toUpperCase();
+    }));
+    var ai = av.firstChild;
+    if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    body.appendChild(av);
+  }
+
+  copy.appendChild(body);
   hero.appendChild(copy);
-  host.appendChild(hero);
+  return hero;
+}
 
-  /* tiles */
-  var totalPoints = 0, bestGw = 0, bestGwTeam = '';
-  t.forEach(function(r){ totalPoints += r.points; if (r.high > bestGw) { bestGw = r.high; bestGwTeam = r.name; } });
-  var avg = played ? (totalPoints / (played * t.length)) : 0;
+/* ---- TILES ----
+   Four zeros and "BEST GW -" is not a summary of anything. Before the
+   season starts these carry the numbers that do exist. */
+function homeTiles_(played){
+  var bar = el('div','stats');
+  var vals;
 
-  var tiles = el('div','tiles');
-  [[played,'GAMEWEEKS'],[totalPoints.toLocaleString(),'POINTS SCORED'],
-   [bestGw,'BEST GW - ' + bestGwTeam.toUpperCase()],[avg.toFixed(1),'LEAGUE AVERAGE']]
-    .forEach(function(pair){
-      var d = el('div','tile');
-      d.appendChild(el('b', null, String(pair[0])));
-      d.appendChild(el('span', null, pair[1]));
-      tiles.appendChild(d);
+  if (!played){
+    var signed = (DATA.register || []).filter(function(r){ return r.action === 'SIGN'; }).length;
+    vals = [
+      [String(draftManagers_().length), 'MANAGERS'],
+      [String((DATA.players || []).length), 'PLAYERS IN THE POOL'],
+      [CONFIG.squad ? '\u00a3' + CONFIG.squad.budget + 'm' : '\u2013', 'EACH TO SPEND'],
+      [String(signed), signed ? 'SIGNED SO FAR' : 'NOTHING SIGNED YET']
+    ];
+  } else {
+    var total = 0, best = 0, bestWho = '';
+    (DATA.table || []).forEach(function(t){ total += num(t.points); });
+    Object.keys(DATA.scores || {}).forEach(function(n){
+      Object.keys(DATA.scores[n]).forEach(function(g){
+        var v = num(DATA.scores[n][g]);
+        if (v > best) { best = v; bestWho = n; }
+      });
     });
-  host.appendChild(tiles);
+    var ave = DATA.table.length ? Math.round(total / DATA.table.length / played * 10) / 10 : 0;
+    vals = [
+      [String(played), 'GAMEWEEKS PLAYED'],
+      [total.toLocaleString(), 'POINTS SCORED'],
+      [best ? String(best) : '\u2013', best ? 'BEST GW \u00b7 ' + bestWho.toUpperCase() : 'BEST GW'],
+      [String(ave), 'LEAGUE AVERAGE']
+    ];
+  }
 
-  /* competitions */
-  var sec = el('div','sec');
-  sec.appendChild(el('div','sec-h','Competitions'));
+  vals.forEach(function(v){
+    var t = el('div','tile');
+    t.appendChild(el('div','tv', v[0]));
+    t.appendChild(el('div','tl', v[1]));
+    bar.appendChild(t);
+  });
+  return bar;
+}
 
-  var h2hWin = winnerOf(DATA.h2hKO, DATA.h2h ? DATA.h2h.table : null);
-  var cupWin = winnerOf(DATA.cupKO, null);
+/* ---- COMPETITION BLOCKS ----
+   Colour block for identity, white below for the numbers - six
+   saturated panels in a row fight each other, and a manager photo
+   needs somewhere calm to sit.
+
+   The status says what has actually happened. Nothing reads champion
+   until it has been won. */
+function homeComps_(played){
+  var grid = el('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:10px';
 
   CONFIG.comps.forEach(function(c){
-    var winner = '-', note = c.meta;
-    if (c.key === 'league') { winner = leader.name; note = leader.points + ' pts - ' + (complete ? 'won by ' + margin : margin + ' ahead'); }
-    if (c.key === 'h2h')    { winner = h2hWin.name || '-'; note = h2hWin.note || c.meta; }
-    if (c.key === 'cup')    { winner = cupWin.name || '-'; note = cupWin.note || c.meta; }
-    if (c.key === 'superliga') { winner = '-'; note = c.meta; }
-    if (c.key === 'supercopa') { winner = '-'; note = c.meta; }
+    var st = compState_(c, played);
 
-    var row = el('div','comp');
-    row.style.borderLeftColor = c.colour;
-    row.style.cursor = 'pointer';
-    row.setAttribute('data-comp', c.key);
-    if (winner === '-') row.style.opacity = '.72';
+    var card = el('div');
+    card.style.cssText = 'border-radius:3px;overflow:hidden;cursor:pointer;background:' + c.colour;
+    card.addEventListener('click', function(){ go(compRoute_(c.key)); });
 
-    var lg = el('div','comp-logo');
-    var lim = imgTry(CONFIG.img.comp(c.key), function(){ lg.textContent = 'LOGO'; });
-    lg.appendChild(lim);
-    row.appendChild(lg);
+    var head = el('div');
+    head.style.cssText = 'padding:12px 14px 11px;display:flex;align-items:center;gap:11px';
 
-    var mid = el('div','comp-mid');
-    mid.appendChild(el('div','comp-name', c.name));
-    mid.appendChild(el('div','comp-meta', c.meta));
-    row.appendChild(mid);
+    /* a tile behind the badge, so a white logo on a white row is not
+       invisible and a dark one on a dark block is not either */
+    var badge = el('span');
+    badge.style.cssText = 'width:42px;height:42px;flex-shrink:0;display:flex;align-items:center;'
+      + 'justify-content:center;background:rgba(255,255,255,.14);border-radius:3px;overflow:hidden';
+    badge.appendChild(imgTry(CONFIG.img.comp(c.img || c.key), function(){
+      badge.style.background = 'rgba(255,255,255,.1)';
+    }));
+    var bi = badge.firstChild;
+    if (bi && bi.style) bi.style.cssText = 'max-width:78%;max-height:78%;object-fit:contain';
+    head.appendChild(badge);
 
-    var right = el('div','comp-right');
-    right.appendChild(el('div','comp-lbl','WINNER'));
-    right.appendChild(el('div','comp-win', winner));
-    right.appendChild(el('div','comp-note', note));
-    row.appendChild(right);
+    var t = el('span');
+    t.style.cssText = 'flex:1;min-width:0';
+    t.appendChild(cell_(c.name.toUpperCase(),
+      'display:block;font-size:12px;font-weight:900;letter-spacing:1.1px;color:#fff;'
+      + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'));
+    t.appendChild(cell_(c.meta,
+      'display:block;font-size:9px;font-weight:600;color:rgba(255,255,255,.7);margin-top:2px'));
+    head.appendChild(t);
+    card.appendChild(head);
 
-    sec.appendChild(row);
+    var foot = el('div');
+    foot.style.cssText = 'background:#fff;padding:11px 14px;display:flex;align-items:center;'
+      + 'gap:10px;min-height:58px';
+
+    if (st.who){
+      var kit = kitFor(st.who);
+      var av = el('span');
+      av.style.cssText = 'width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+        + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;align-items:center;'
+        + 'justify-content:center;font-size:11px;font-weight:900';
+      av.appendChild(imgTry(CONFIG.img.manager(st.who), function(){
+        av.textContent = st.who.substring(0,2).toUpperCase();
+      }));
+      var ai = av.firstChild;
+      if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+      foot.appendChild(av);
+
+      var w = el('span');
+      w.style.cssText = 'flex:1;min-width:0';
+      w.appendChild(cell_(st.label,
+        'display:block;font-size:8px;font-weight:900;letter-spacing:1.2px;color:'
+        + (st.done ? c.colour : '#8a939c')));
+      w.appendChild(cell_(st.who,
+        'display:block;font-size:17px;font-weight:900;color:#0C2340;letter-spacing:-.4px;'
+        + 'line-height:1.1;margin-top:1px'));
+      if (st.sub) w.appendChild(cell_(st.sub,
+        'display:block;font-size:10px;color:#8a939c;margin-top:1px'));
+      foot.appendChild(w);
+    } else {
+      var n = el('span');
+      n.style.cssText = 'flex:1;min-width:0';
+      n.appendChild(cell_(st.label,
+        'display:block;font-size:8px;font-weight:900;letter-spacing:1.2px;color:' + c.colour));
+      n.appendChild(cell_(st.sub || '',
+        'display:block;font-size:13px;font-weight:700;color:#5a6570;margin-top:3px'));
+      foot.appendChild(n);
+    }
+
+    card.appendChild(foot);
+    grid.appendChild(card);
   });
-
-  sec.addEventListener('click', function(e){
-    var r = e.target.closest('.comp[data-comp]');
-    if (r) go(r.getAttribute('data-comp'));
-  });
-
-  host.appendChild(sec);
+  return grid;
 }
+
+function compRoute_(key){
+  return { league:'league', h2h:'h2h', cup:'cup',
+           superliga:'sliga', supercopa:'super', copa:'super' }[key] || 'home';
+}
+
+/* How far a competition has actually got, in its own words. */
+function compState_(c, played){
+  function tableTop(rows){
+    if (!rows || !rows.length) return null;
+    return rows[0];
+  }
+
+  if (c.key === 'league'){
+    if (!played) return { label: txt('label.notstarted','NOT STARTED'), sub:'starts GW1' };
+    var t = DATA.table[0];
+    var m = DATA.table.length > 1 ? t.points - DATA.table[1].points : 0;
+    return { label: played >= CONFIG.totalGameweeks ? 'CHAMPION' : 'LEADER',
+             who: t.name, sub: t.points + ' pts  \u00b7  ' + (m ? m + ' clear' : 'level'),
+             done: played >= CONFIG.totalGameweeks };
+  }
+
+  if (c.key === 'h2h'){
+    var ko = koActive(DATA.h2hKO);
+    var top = tableTop(DATA.h2h && DATA.h2h.table);
+    if (!top) return { label:'NOT STARTED', sub:'starts GW1' };
+    if (ko){
+      var w = winnerOf(DATA.h2hKO, DATA.h2h.table);
+      if (w && w.name && played >= CONFIG.totalGameweeks){
+        return { label:'CHAMPION', who:w.name, sub:'', done:true };
+      }
+      return { label:'KNOCKOUT', sub:'semi-finals and final to come' };
+    }
+    return { label:'1ST OF ' + DATA.h2h.table.length, who:top.name,
+             sub:(top.w||0) + '-' + (top.d||0) + '-' + (top.l||0) + '  \u00b7  ' + top.pts + ' pts' };
+  }
+
+  if (c.key === 'cup'){
+    var g = DATA.cup;
+    var any = g && ((g.a && g.a.length) || (g.b && g.b.length));
+    if (!any) return { label:'NOT STARTED', sub: c.meta.split(' - ')[0] };
+    if (koActive(DATA.cupKO)) return { label:'KNOCKOUT', sub:'the final is GW38' };
+    var lead = tableTop(g.a) || tableTop(g.b);
+    return { label:'GROUP STAGE', who: lead ? lead.name : '',
+             sub: lead ? 'top of group A' : '' };
+  }
+
+  if (c.key === 'superliga'){
+    var sl = superLigaTable_();
+    if (!sl.length) return { label:'NOT STARTED', sub:'all 22 \u00b7 GW1-38' };
+    return { label: played >= CONFIG.totalGameweeks ? 'CHAMPION' : 'LEADER',
+             who: sl[0].name,
+             sub: sl[0].pts + ' pts  \u00b7  played ' + (sl[0].pld || sl[0].played || 0),
+             done: played >= CONFIG.totalGameweeks };
+  }
+
+  if (c.key === 'supercopa'){
+    var ap = DATA.apertura, cl = DATA.clausura;
+    var half = (cl && cl.groups && Object.keys(cl.groups).length) ? cl : ap;
+    if (!half || !half.groups || !Object.keys(half.groups).length){
+      return { label:'NOT STARTED', sub:'Apertura starts GW1' };
+    }
+    var name = half === cl ? 'Clausura' : 'Apertura';
+    var ties = knockoutTies_('Supercopa ' + name);
+    if (ties.length){
+      var live = ties.filter(function(t){ return t.legs[1]; });
+      return { label:(live[live.length-1].stage || 'KNOCKOUT').toUpperCase(),
+               sub: name + '  \u00b7  ' + live.length + ' ties' };
+    }
+    return { label:'GROUP STAGE', sub: name + '  \u00b7  four groups' };
+  }
+
+  if (c.key === 'copa'){
+    var ct = knockoutTies_('Copa del Campeones');
+    if (!ct.length) return { label:'TBC', sub:'decided at GW36' };
+    var f = ct[0].legs[1];
+    return { label:'FINAL', sub: f.home + ' v ' + f.away };
+  }
+
+  return { label:'\u2013', sub:'' };
+}
+
+/* ---- TRACKER ----
+   This gameweek, one competition at a time, in that competition's
+   colours. Only competitions with a fixture this week appear, so it
+   never offers an empty panel. */
+function homeTracker_(){
+  var gw = DATA.gw ? DATA.gw.played : 0;
+  if (!gw) return null;
+
+  var byComp = {}, order = [];
+  (DATA.fixtures || []).forEach(function(f){
+    if (f.gw !== gw) return;
+    if (!DATA.scores[f.home] || !DATA.scores[f.away]) return;   /* placeholders */
+    if (!byComp[f.comp]) { byComp[f.comp] = []; order.push(f.comp); }
+    byComp[f.comp].push(f);
+  });
+  if (!order.length) return null;
+
+  var wrap = el('div');
+  wrap.style.cssText = 'border-radius:4px;overflow:hidden;margin-bottom:20px';
+
+  function draw(){
+    clear(wrap);
+    if (HOME_TRACK >= order.length) HOME_TRACK = 0;
+    var comp = order[HOME_TRACK];
+    var col = compColourFor(comp);
+    var list = byComp[comp].slice(0, 6);
+
+    var head = el('div');
+    head.style.cssText = 'background:' + col.colour + ';color:#fff;padding:11px 16px;'
+      + 'display:flex;align-items:center;gap:11px;flex-wrap:wrap';
+    head.appendChild(cell_(comp.toUpperCase(),
+      'font-size:11px;font-weight:900;letter-spacing:1.4px'));
+    head.appendChild(cell_('GAMEWEEK ' + gw,
+      'font-size:10px;font-weight:700;opacity:.75'));
+
+    var dots = el('span');
+    dots.style.cssText = 'margin-left:auto;display:flex;gap:4px';
+    order.forEach(function(_, k){
+      var d = el('span');
+      d.style.cssText = 'width:16px;height:3px;cursor:pointer;background:'
+        + (k === HOME_TRACK ? '#fff' : 'rgba(255,255,255,.35)');
+      d.addEventListener('click', function(){
+        HOME_TRACK = k;
+        if (HOME_TIMER) { clearInterval(HOME_TIMER); HOME_TIMER = null; }
+        draw();
+      });
+      dots.appendChild(d);
+    });
+    head.appendChild(dots);
+    wrap.appendChild(head);
+
+    var body = el('div');
+    body.style.cssText = 'background:#fff;border:0.5px solid #e3e8ee;border-top:none;'
+      + 'display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))';
+    list.forEach(function(f, k){
+      var hs = DATA.scores[f.home] && DATA.scores[f.home][gw];
+      var as = DATA.scores[f.away] && DATA.scores[f.away][gw];
+      var row = scoreRow_(f.home, hs, f.away, as, col.colour, { tight: true });
+      row.style.cssText += ';border-left:' + (k ? '0.5px solid #e3e8ee' : 'none');
+      body.appendChild(row);
+    });
+    wrap.appendChild(body);
+  }
+
+  draw();
+  if (order.length > 1){
+    HOME_TIMER = setInterval(function(){
+      HOME_TRACK = (HOME_TRACK + 1) % order.length;
+      draw();
+    }, 5000);
+  }
+  return wrap;
+}
+
+/* ---- MANAGER OF THE MONTH ---- */
+function homeMotm_(){
+  var list = DATA.motm || [];
+  if (!list.length) return null;
+
+  var m = list[0];
+  var kit = kitFor(m.name);
+  var wins = 0;
+  list.forEach(function(x){ if (x.name === m.name) wins++; });
+
+  var card = el('div');
+  card.style.cssText = 'border:0.5px solid #e3e8ee;border-radius:4px;overflow:hidden;cursor:pointer';
+  card.addEventListener('click', function(){ go('honours'); });
+
+  var head = el('div');
+  head.style.cssText = 'background:' + kit.main + ';color:' + kit.text
+    + ';padding:11px 14px;display:flex;align-items:center;gap:11px';
+  var av = el('span');
+  av.style.cssText = 'width:44px;height:44px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+    + 'background:rgba(255,255,255,.32);border:2px solid ' + kit.second
+    + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900';
+  av.appendChild(imgTry(CONFIG.img.manager(m.name), function(){
+    av.textContent = m.name.substring(0,2).toUpperCase();
+  }));
+  var ai = av.firstChild;
+  if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  head.appendChild(av);
+
+  var t = el('span');
+  t.style.cssText = 'flex:1;min-width:0';
+  t.appendChild(cell_('MANAGER OF THE MONTH',
+    'display:block;font-size:8px;font-weight:900;letter-spacing:1.5px;opacity:.8'));
+  t.appendChild(cell_(m.name,
+    'display:block;font-size:20px;font-weight:900;letter-spacing:-.5px;line-height:1.1;margin-top:1px'));
+  t.appendChild(cell_(monthLabel(m.month),
+    'display:block;font-size:10px;font-weight:700;opacity:.8'));
+  head.appendChild(t);
+  card.appendChild(head);
+
+  var foot = el('div');
+  foot.style.cssText = 'padding:9px 14px;font-size:11px;color:#8a939c';
+  foot.textContent = wins === 1 ? 'Their first of the season'
+    : 'Their ' + ordinal(wins).toLowerCase() + ' of the season';
+  card.appendChild(foot);
+  return card;
+}
+
+/* ---- LAST GAMEWEEK ----
+   Three numbers from data already loaded, and the reason to look at
+   the page on a Tuesday. */
+function homeLastGw_(gw){
+  if (!gw) return null;
+
+  var high = { v:-1 }, close = { v:1e9 }, big = { v:-1 };
+  Object.keys(DATA.scores || {}).forEach(function(n){
+    var v = DATA.scores[n][gw];
+    if (v === undefined) return;
+    if (num(v) > high.v) high = { v:num(v), n:n };
+  });
+  (DATA.fixtures || []).forEach(function(f){
+    if (f.gw !== gw) return;
+    var h = DATA.scores[f.home] && DATA.scores[f.home][gw];
+    var a = DATA.scores[f.away] && DATA.scores[f.away][gw];
+    if (h === undefined || a === undefined) return;
+    var d = Math.abs(num(h) - num(a));
+    if (d < close.v) close = { v:d, t:f.home + ' v ' + f.away };
+    if (d > big.v) big = { v:d, t:(num(h) > num(a) ? f.home + ' v ' + f.away
+                                                   : f.away + ' v ' + f.home) };
+  });
+  if (high.v < 0) return null;
+
+  var card = el('div');
+  card.style.cssText = 'border:0.5px solid #e3e8ee;border-radius:4px;overflow:hidden';
+  var head = el('div', null, 'GAMEWEEK ' + gw);
+  head.style.cssText = 'background:#f7f9fb;padding:9px 14px;font-size:9px;font-weight:900;'
+    + 'letter-spacing:1.4px;color:#8a939c;border-bottom:0.5px solid #e3e8ee';
+  card.appendChild(head);
+
+  [[String(high.v), 'HIGHEST', high.n, '#00A651'],
+   [close.v < 1e9 ? String(close.v) : '\u2013', 'CLOSEST', close.t || '', '#0091DA'],
+   [big.v >= 0 ? String(big.v) : '\u2013', 'BIGGEST WIN', big.t || '', '#E90052']]
+   .forEach(function(x, k){
+    var row = el('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:11px;padding:10px 14px'
+      + (k ? ';border-top:0.5px solid #f2f4f7' : '');
+    var bar = el('span');
+    bar.style.cssText = 'width:3px;height:26px;background:' + x[3] + ';flex-shrink:0';
+    row.appendChild(bar);
+    row.appendChild(cell_(x[0],
+      'font-size:19px;font-weight:900;color:#0C2340;letter-spacing:-.5px;width:38px'));
+    var t = el('span');
+    t.style.cssText = 'flex:1;min-width:0';
+    t.appendChild(cell_(x[1],
+      'display:block;font-size:8px;font-weight:900;letter-spacing:1.1px;color:#8a939c'));
+    t.appendChild(cell_(x[2],
+      'display:block;font-size:12px;font-weight:700;color:#0C2340;margin-top:1px;'
+      + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'));
+    row.appendChild(t);
+    card.appendChild(row);
+  });
+  return card;
+}
+
 
 function winnerOf(ko, table){
   if (ko && ko.champion && ko.champion !== 'TBD') return { name: ko.champion, note: 'Champion' };
@@ -2130,6 +2709,26 @@ function koActive(ko){
   return ko.ties.some(function(t){
     return t.home && t.away && t.home !== 'TBD' && t.away !== 'TBD';
   });
+}
+
+/* Which gameweek a knockout stage is played in, taken from the
+   Fixtures sheet rather than typed into the heading - so a schedule
+   change moves the label without anyone remembering to. */
+function koGwFor_(stageKey){
+  if (!stageKey) return null;
+  var comp = LEAGUE.h2hName ? LEAGUE.h2hName.replace(' Head to Head', ' H2H') : null;
+  var want = { playoff:'Play-off', quarter:'Quarter-final', semi:'Semi-final', final:'Final' }[stageKey];
+  if (!want) return null;
+
+  var found = null;
+  (DATA.fixtures || []).forEach(function(f){
+    if (found) return;
+    if (f.stage !== want) return;
+    if (comp && f.comp.indexOf(LEAGUE.key === 'L1' ? 'FFS' : 'Audit') !== 0) return;
+    if (f.comp.indexOf('H2H') < 0) return;
+    found = f.gw;
+  });
+  return found;
 }
 
 function renderKOList(host, ko, colour){
@@ -2419,7 +3018,12 @@ function renderLeague(){
   mast.appendChild(bands);
   var copy = el('div','copy');
   var slot = el('div','lt-slot');
-  var lsIm = imgTry(CONFIG.img.comp('league'), function(){ slot.textContent = 'LOGO'; });
+  /* the outline is only for an absent badge - once one loads it would
+     frame the artwork */
+  var lsIm = imgTry(CONFIG.img.comp('league'), function(){
+    slot.textContent = 'LOGO';
+    slot.style.border = '1px dashed rgba(255,255,255,.55)';
+  });
   slot.appendChild(lsIm);
   copy.appendChild(slot);
   var inner = el('div');
@@ -2450,7 +3054,10 @@ function renderLeague(){
   play.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   var range = document.createElement('input');
   range.type = 'range'; range.min = '1'; range.max = String(maxGw); range.value = String(maxGw);
-  range.style.accentColor = cols[0];
+  /* the league's ramp, left to right, and the thumb takes whichever
+     colour the season has reached */
+  range.style.background = 'linear-gradient(90deg,' + cols.join(',') + ')';
+  scrub.style.setProperty('--scrub-thumb', cols[cols.length - 1]);
   var val = el('span','val','GW' + maxGw);
   scrub.appendChild(play); scrub.appendChild(range); scrub.appendChild(val);
   host.appendChild(scrub);
@@ -2478,6 +3085,12 @@ function renderLeague(){
 
   function paint(gw){
     scrubGw = gw;
+    /* the thumb picks up the colour at that point in the ramp, so the
+       control agrees with the header it sits under */
+    var ci = Math.min(cols.length - 1,
+      Math.max(0, Math.round((gw - 1) / Math.max(1, maxGw - 1) * (cols.length - 1))));
+    scrub.style.setProperty('--scrub-thumb', cols[ci]);
+    play.style.background = cols[ci];
     val.textContent = 'GW' + gw;
     clear(body);
     var rows = tableAt(gw), prev = gw > 1 ? tableAt(gw - 1) : null;
@@ -2672,7 +3285,13 @@ function renderH2H(){
   /* masthead */
   var mast = el('div','h2h-mast');
   var slot = el('div','h2h-slot');
-  var sIm = imgTry(CONFIG.img.comp('h2h'), function(){ slot.textContent = 'LOGO'; });
+  /* no box round the badge - the outline comes back only if the
+     image is missing, so LOGO has something to sit in */
+  var sIm = imgTry(CONFIG.img.comp('h2h'), function(){
+    slot.textContent = 'LOGO';
+    slot.style.border = '1px dashed rgba(255,255,255,.45)';
+    slot.style.fontSize = '9px';
+  });
   slot.appendChild(sIm);
   mast.appendChild(slot);
   var mid = el('div');
@@ -3021,20 +3640,44 @@ function buildKnockout(host){
     return;
   }
 
-  var groups = {};
+  /* Stages are read from the sheet's own labels, not guessed at.
+
+     This had two buckets - anything containing "semi" and everything
+     else - so the FFS play-offs were filed under SEMI-FINALS and the
+     semis and the final both piled into FINAL. Every heading was one
+     stage out, and it looked deliberate.
+
+     The Audit league has no play-off round, which is why the bug only
+     showed on FFS: with two stages the two buckets happened to line
+     up.                                                             */
+  var STAGES = [
+    { key:'playoff', label:'PLAY-OFF',    test:function(l){ return l.indexOf('play') >= 0 || l.indexOf('po') === 0; } },
+    { key:'quarter', label:'QUARTER-FINALS', test:function(l){ return l.indexOf('quarter') >= 0 || l.indexOf('qf') === 0; } },
+    { key:'semi',    label:'SEMI-FINALS', test:function(l){ return l.indexOf('semi') >= 0 || l.indexOf('sf') === 0; } },
+    { key:'final',   label:'FINAL',       test:function(l){ return l.indexOf('final') >= 0 || l.indexOf('f') === 0; } }
+  ];
+
+  var groups = {}, gws = {};
   DATA.h2hKO.ties.forEach(function(t){
     var low = String(t.label).toLowerCase();
-    var key = low.indexOf('semi') >= 0 || low.indexOf('sf') === 0 ? 'SEMI-FINALS - GW37' : 'FINAL - GW38';
-    if (!groups[key]) groups[key] = [];
+    var hit = null;
+    for (var i = 0; i < STAGES.length; i++){
+      if (STAGES[i].test(low)) { hit = STAGES[i]; break; }
+    }
+    var key = hit ? hit.key : 'other';
+    if (!groups[key]) { groups[key] = []; gws[key] = koGwFor_(hit ? hit.key : null); }
     groups[key].push(t);
   });
 
-  ['SEMI-FINALS - GW37','FINAL - GW38'].forEach(function(k){
-    if (!groups[k]) return;
-    var h = el('div', null, k);
-    h.style.cssText = 'font-size:9px;font-weight:900;letter-spacing:2px;color:rgba(255,255,255,.9);margin:8px 0 9px';
+  STAGES.concat([{ key:'other', label:'OTHER' }]).forEach(function(st){
+    var list = groups[st.key];
+    if (!list || !list.length) return;
+    var gw = gws[st.key];
+    var h = el('div', null, st.label + (gw ? '  -  GW' + gw : ''));
+    h.style.cssText = 'font-size:9px;font-weight:900;letter-spacing:2px;'
+      + 'color:rgba(255,255,255,.9);margin:8px 0 9px';
     pad.appendChild(h);
-    groups[k].forEach(function(t){
+    list.forEach(function(t){
       var r = scoreRow(t.home, t.hs, t.away, t.as, H2H_CY);
       r.style.marginBottom = '9px';
       pad.appendChild(r);
@@ -3118,7 +3761,14 @@ function renderCup(){
 
   var mast = el('div','cup-mast');
   var slot = el('div','cup-slot');
-  var im = imgTry(CONFIG.img.comp('cup'), function(){ slot.textContent = 'LOGO'; });
+  /* the box is gone so the badge is not framed. A missing badge still
+     needs an outline or the word LOGO floats in space, so it is put
+     back only when the image fails. */
+  var im = imgTry(CONFIG.img.comp('cup'), function(){
+    slot.textContent = 'LOGO';
+    slot.style.border = '2px solid rgba(255,255,255,.4)';
+    slot.style.fontSize = '9px';
+  });
   slot.appendChild(im);
   mast.appendChild(slot);
   var mid = el('div');
@@ -3169,7 +3819,10 @@ function cupGroups(host){
       var row = el('div','cgr');
       if (!q) row.style.opacity = '.45';
       var pw = el('span','p');
-      var bar = el('i'); bar.style.background = pos===1 ? '#2A2A2A' : q ? '#93A8C8' : 'transparent';
+      /* first place gold. It was near-black, which read as "nothing
+         special" next to the pale blue of the other qualifiers. */
+      var bar = el('i');
+      bar.style.background = pos===1 ? 'var(--gold)' : q ? '#93A8C8' : 'transparent';
       pw.appendChild(bar); pw.appendChild(el('b', null, String(pos)));
       row.appendChild(pw);
       var av = el('span','av'); av.appendChild(photo(t.name)); row.appendChild(av);
@@ -3650,6 +4303,7 @@ function squadRow(p, hasFees, kit, best){
   var ph = playerPhoto(null, p.name, 26);
   ph.style.flexShrink = '0';
   row.appendChild(ph);
+  clickable_(row, null, p.name);
 
   row.appendChild(cell_(p.name,
     'flex:1;min-width:70px;font-size:12px;font-weight:700;color:#0C2340;'
@@ -3838,13 +4492,9 @@ function recordAgainst(opp, comp){
    The running position is read from the Positions sheet, not worked
    out here. The standings rules live in the workbook and there is no
    second copy of them on this side to drift.                        */
-var COMP_ACCENT = {
-  'FFS H2H':'#003399', 'Audit H2H':'#003399',
-  'FFS Cup':'#CC0000', 'Audit Cup':'#CC0000',
-  'SuperLiga':'#0B7A4B',
-  'Supercopa Apertura':'#C9A227', 'Supercopa Clausura':'#C9A227',
-  'Copa del Campeones':'#8B1E33'
-};
+/* superseded by compColourFor, which reads CONFIG.comps - kept as a
+   name so nothing that referenced it breaks */
+function compAccent(name){ return compColourFor(name).colour; }
 var RESULT_COLOUR = { W:'#1D9E75', D:'#EF9F27', L:'#E24B4A' };
 
 function mgrList(host, played){
@@ -3864,7 +4514,7 @@ function mgrList(host, played){
   });
 
   order.forEach(function(comp){
-    var accent = COMP_ACCENT[comp] || kitFor(MGR.name).second;
+    var accent = compAccent(comp);
     var mine = byComp[comp];
     var now = positionAt(comp, MGR.name);
 
@@ -4150,6 +4800,19 @@ function note_(text){
 var GOLD      = '#D9AF2B';
 var GOLD_DARK = '#8A6A0C';
 var GOLD_DEEP = '#C9A227';
+
+/* Which competition a name belongs to, so a block, a fixture row and
+   a page masthead all reach for the same colour. */
+function compKeyFor(name){
+  var n = String(name || '').toLowerCase();
+  if (n.indexOf('copa del') >= 0) return 'copa';
+  if (n.indexOf('supercopa') >= 0) return 'supercopa';
+  if (n.indexOf('superliga') >= 0) return 'superliga';
+  if (n.indexOf('cup') >= 0) return 'cup';
+  if (n.indexOf('h2h') >= 0 || n.indexOf('head to head') >= 0) return 'h2h';
+  return 'league';
+}
+function compColourFor(name){ return CONFIG.compColour(compKeyFor(name)); }
 
 /* The gold field, with the decorative circles behind everything. */
 function goldField_(host){
@@ -4994,10 +5657,10 @@ function honChampions(pad){
     ['CUP','#CC0000','cup']
   ];
   var shared = [
-    ['SUPERLIGA','#0B7A4B','superliga'],
+    ['SUPERLIGA','#C9A227','superliga'],
     ['SUPERCOPA APERTURA','#C9A227','apertura'],
     ['SUPERCOPA CLAUSURA','#C9A227','clausura'],
-    ['COPA DEL CAMPEONES','#8B1E33','supercopa']
+    ['COPA DEL CAMPEONES','#C9A227','supercopa']
   ];
 
   CONFIG.leagues.forEach(function(lg){
@@ -5024,41 +5687,65 @@ function honChampions(pad){
   pad.appendChild(rollTable_());
 }
 
-/* Which manager holds a trophy, read from USER_CHAMPIONS by column
-   name rather than by position.
+/* Which manager holds a trophy, read from USER_CHAMPIONS.
 
-   A per-league trophy needs the league in the column name, because
-   both leagues have a League, a Head to Head and a Cup - "FFS Cup"
-   and "Audit Cup" are different trophies. Without that the Audit
-   panels showed the FFS winners, which is worse than showing nothing:
-   it is a real name, in the right place, and wrong.
+   THE COLUMN AND THE CARD RARELY SPELL IT THE SAME WAY
+   The card says HEAD TO HEAD, the sheet says "FFS H2H". Matching on
+   the label alone found nothing and the panel showed a dash - which
+   looks exactly like "nobody has won this yet" rather than "these two
+   words are different".
 
-   A bare "Cup" column is taken as the draft league's, so an archive
-   written before the second league existed still reads correctly. */
+   So each competition carries the spellings it answers to, and the
+   league prefix is stripped off before comparing. A column may be
+   "FFS H2H", "Head to Head" or "H2H" and all three land.          */
+
+var COMP_ALIASES = {
+  'OVERALL LEAGUE':     ['overall league', 'league'],
+  'HEAD TO HEAD':       ['head to head', 'head-to-head', 'h2h'],
+  'CUP':                ['cup'],
+  'SUPERLIGA':          ['superliga', 'super liga'],
+  'SUPERCOPA APERTURA': ['supercopa apertura', 'apertura'],
+  'SUPERCOPA CLAUSURA': ['supercopa clausura', 'clausura'],
+  'COPA DEL CAMPEONES': ['copa del campeones', 'copa', 'champion of champions']
+};
+
+/* "FFS H2H" -> { league:'ffs', comp:'h2h' } */
+function splitCompKey_(key){
+  var s = String(key || '').toLowerCase().trim();
+  var league = null;
+  CONFIG.leagues.forEach(function(l){
+    if (league) return;
+    var p = String(l.name || '').toLowerCase().replace(' league', '').trim();
+    if (p && s.indexOf(p + ' ') === 0){ league = p; s = s.slice(p.length + 1).trim(); }
+  });
+  return { league: league, comp: s };
+}
+
 function holderFor_(row, compLabel, leagueName){
   if (!row) return null;
 
-  var want = compLabel.toLowerCase();
-  var lg = leagueName ? leagueName.toLowerCase().replace(' league','') : null;
+  var aliases = COMP_ALIASES[compLabel] || [String(compLabel).toLowerCase()];
+  var lg = leagueName
+    ? String(leagueName).toLowerCase().replace(' league', '').trim() : null;
   var keys = Object.keys(row.by || {});
 
-  /* exact league-qualified match first */
-  if (lg){
-    for (var i = 0; i < keys.length; i++){
-      var k = keys[i].toLowerCase();
-      if (k.indexOf(lg) === 0 && k.indexOf(want.replace('overall ','')) >= 0) return row.by[keys[i]];
-    }
+  /* a column that names its league wins outright */
+  for (var i = 0; i < keys.length; i++){
+    var p = splitCompKey_(keys[i]);
+    if (aliases.indexOf(p.comp) < 0) continue;
+    if (p.league && lg && p.league === lg) return row.by[keys[i]];
   }
 
-  /* an unqualified column belongs to the draft league only */
+  /* an unqualified column belongs to the draft league only, so an
+     archive written before the second league existed still reads
+     correctly without putting its winners on the wrong panel */
   var draft = CONFIG.leagues[0];
-  var allowBare = !leagueName || leagueName === draft.name;
-  if (!allowBare) return null;
+  if (leagueName && leagueName !== draft.name) return null;
 
   for (var j = 0; j < keys.length; j++){
-    var kk = keys[j].toLowerCase();
-    if (kk.indexOf('ffs') === 0 || kk.indexOf('audit') === 0) continue;
-    if (kk === want || kk === want.replace('overall ','')) return row.by[keys[j]];
+    var q = splitCompKey_(keys[j]);
+    if (q.league) continue;
+    if (aliases.indexOf(q.comp) >= 0) return row.by[keys[j]];
   }
   return null;
 }
@@ -5437,31 +6124,438 @@ var HON_MGR = null;
 
 /* ---- OUTTAKES ---- */
 function honOuttakes(pad){
-  var n = CONFIG.img.outtakeCount || 0;
-  if (!n){ pad.appendChild(bigNote_(txt('empty.outtakes', 'No outtakes yet.'))); return; }
-
   pad.appendChild(honHead_('Outtakes'));
-
-  var slides = [];
-  for (var i = 1; i <= n; i++) slides.push({ img: CONFIG.img.outtake(i), name: '', kit: null });
 
   var grid = el('div');
   grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px';
-  slides.forEach(function(sl, i){
+  pad.appendChild(grid);
+
+  var count = el('div');
+  count.style.cssText = 'margin-top:14px;font-size:11px;color:#8a939c';
+  pad.appendChild(count);
+
+  var found = [];
+  var misses = 0;
+  var stop = CONFIG.img.outtakeStopAfter || 3;
+  var max = CONFIG.img.outtakeMax || 200;
+
+  /* Walk upwards, keeping what exists and counting what does not.
+     Three misses in a row means the end - which tolerates a gap in
+     the numbering without running to two hundred requests. */
+  function look(n){
+    if (n > max || misses >= stop){ done(); return; }
+    var probe = new Image();
+    var tried = 0;
+    var base = CONFIG.img.outtake(n);
+    probe.onload = function(){
+      found.push({ img: base, name: '', kit: null, n: n });
+      misses = 0;
+      add(found.length - 1);
+      look(n + 1);
+    };
+    probe.onerror = function(){
+      tried++;
+      if (tried < CONFIG.img.types.length){
+        probe.src = base + CONFIG.img.types[tried];
+        return;
+      }
+      misses++;
+      look(n + 1);
+    };
+    probe.src = base + CONFIG.img.types[0];
+  }
+
+  function add(i){
+    var sl = found[i];
     var cell = el('div');
     cell.style.cssText = 'aspect-ratio:4/3;background:#f1f4f7;overflow:hidden;cursor:pointer;'
       + 'display:flex;align-items:center;justify-content:center';
-    cell.appendChild(imgTry(sl.img, function(){
+    var im = imgTry(sl.img, function(){
       if (cell.parentNode) cell.parentNode.removeChild(cell);
-    }));
-    var ci = cell.firstChild;
-    if (ci && ci.style) ci.style.cssText = 'width:100%;height:100%;object-fit:cover';
-    cell.addEventListener('click', function(){ openLightbox(slides, i); });
+    });
+    im.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    cell.appendChild(im);
+    cell.addEventListener('click', function(){ openLightbox(found, i); });
     grid.appendChild(cell);
-  });
-  pad.appendChild(grid);
+  }
+
+  function done(){
+    if (!found.length){
+      clear(count);
+      pad.appendChild(bigNote_(txt('empty.outtakes', 'No outtakes yet.')));
+      return;
+    }
+    count.textContent = found.length + ' outtake'
+      + (found.length === 1 ? '' : 's') + '. Drop another into img/outtakes as outtake-'
+      + (found[found.length - 1].n + 1) + ' and it appears here.';
+  }
+
+  look(1);
 }
 
+
+/* =====================================================================
+   PLAYER CARD
+
+   One card, opened from anywhere a player's name appears. It takes an
+   id and looks everything up itself rather than being handed a shape,
+   because the Players tab, the Portal and the Squad tabs all know
+   different things about the same player and three cards would drift.
+
+   Headed in the club's colours. Two seasons: this one live, last one
+   from the archive sheet.
+
+   THE AVAILABILITY BAND IS THE POINT
+   Chance of playing under 100 draws an amber band, zero draws a red
+   one, and the news line says why. On draft night that is what stops
+   somebody bidding twelve million on a player who left the league in
+   July and is still sitting in the game.
+   ===================================================================== */
+
+var PC_SEASON = 'now';
+
+function openPlayer(id, name){
+  PC_SEASON = 'now';
+  paintPlayerCard(id, name);
+}
+
+function paintPlayerCard(id, name){
+  closePlayer();
+
+  var p = playerRecord_(id, name);
+  if (!p) return;
+
+  var veil = el('div');
+  veil.id = 'pc-veil';
+  veil.style.cssText = 'position:fixed;inset:0;z-index:320;background:rgba(12,35,64,.72);'
+    + 'display:flex;align-items:center;justify-content:center;padding:18px';
+  veil.addEventListener('click', function(e){ if (e.target === veil) closePlayer(); });
+
+  var card = el('div');
+  card.style.cssText = 'width:100%;max-width:500px;max-height:88vh;overflow-y:auto;'
+    + 'background:#fff;border-radius:4px;box-shadow:0 18px 50px rgba(0,0,0,.42)';
+
+  var cc = clubColour(p.club);
+  var pale = colourGap(cc.colour, '#FFFFFF') < 12;
+
+  /* ---- header ---- */
+  var head = el('div');
+  head.style.cssText = 'background:' + cc.colour + ';color:' + cc.ink + ';padding:15px 18px 0'
+    + (pale ? ';border-bottom:2px solid ' + cc.ink : '');
+
+  var row = el('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:13px;padding-bottom:14px';
+  var ph = playerPhoto(p.id, p.web, 56);
+  ph.style.cssText += ';flex-shrink:0;border:2px solid ' + (pale ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.3)');
+  row.appendChild(ph);
+
+  var who = el('div');
+  who.style.cssText = 'flex:1;min-width:0';
+  who.appendChild(cell_(p.web,
+    'display:block;font-size:25px;font-weight:900;letter-spacing:-.7px;line-height:1.05'));
+
+  var meta = el('div');
+  meta.style.cssText = 'display:flex;align-items:center;gap:7px;margin-top:4px;flex-wrap:wrap';
+  var pos = el('span', null, p.pos);
+  pos.style.cssText = 'font-size:9px;font-weight:900;letter-spacing:.9px;padding:2px 7px;'
+    + 'background:' + (PO_POSCOL[p.pos] || '#8a939c') + ';color:#fff';
+  meta.appendChild(pos);
+  meta.appendChild(cell_(String(p.clubName || p.club).toUpperCase(),
+    'font-size:11px;font-weight:700;opacity:.75'));
+  if (p.owner){
+    meta.appendChild(cell_('\u00b7', 'font-size:11px;opacity:.4'));
+    meta.appendChild(cell_(p.owner, 'font-size:11px;font-weight:700'));
+  }
+  who.appendChild(meta);
+  row.appendChild(who);
+
+  var dr = p.val('draft_rank', 'draft rank');
+  if (dr !== ''){
+    var rk = el('div');
+    rk.style.cssText = 'text-align:right;flex-shrink:0';
+    rk.appendChild(cell_('DRAFT RANK',
+      'display:block;font-size:9px;font-weight:800;letter-spacing:1.1px;opacity:.7'));
+    rk.appendChild(cell_(String(dr),
+      'display:block;font-size:21px;font-weight:900;letter-spacing:-.5px'));
+    row.appendChild(rk);
+  }
+  head.appendChild(row);
+
+  /* season tabs, only if there is a second season to show */
+  if (p.hasPrior){
+    var tabs = el('div');
+    tabs.style.cssText = 'display:flex;gap:18px';
+    [['now', CONFIG.season],['prior','2025/26']].forEach(function(v){
+      var on = PC_SEASON === v[0];
+      var b = el('button', null, v[1]);
+      b.style.cssText = 'font:inherit;font-size:11px;font-weight:' + (on ? '800' : '700')
+        + ';cursor:pointer;background:none;border:none;padding:0 0 9px;color:'
+        + (on ? cc.ink : (pale ? 'rgba(0,0,0,.45)' : 'rgba(255,255,255,.55)'))
+        + ';border-bottom:3px solid ' + (on ? cc.ink : 'transparent');
+      b.addEventListener('click', function(){
+        if (on) return;
+        PC_SEASON = v[0];
+        paintPlayerCard(id, name);
+      });
+      tabs.appendChild(b);
+    });
+    head.appendChild(tabs);
+  } else {
+    head.appendChild(cell_('', 'display:block;height:6px'));
+  }
+  card.appendChild(head);
+
+  /* ---- availability ---- */
+  var band = availabilityBand_(p);
+  if (band) card.appendChild(band);
+
+  /* ---- headline four ---- */
+  var big = el('div');
+  big.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e3e8ee';
+  [[p.val('total_points','total points'), 'POINTS'],
+   [p.val('points_per_game','pts per game'), 'PER GAME'],
+   [p.val('minutes','minutes'), 'MINUTES'],
+   [p.val('ict_index','ict index'), 'ICT INDEX']].forEach(function(x){
+    var d = el('div');
+    d.style.cssText = 'background:#fff;padding:11px 12px';
+    d.appendChild(cell_(x[0] === '' ? '\u2013' : String(x[0]),
+      'display:block;font-size:22px;font-weight:900;color:#0C2340;letter-spacing:-.8px;line-height:1'));
+    d.appendChild(cell_(x[1],
+      'display:block;font-size:8px;font-weight:800;letter-spacing:1px;color:#8a939c;margin-top:4px'));
+    big.appendChild(d);
+  });
+  card.appendChild(big);
+
+  /* ---- breakdown, by position ---- */
+  var bd = breakdownFor_(p);
+  if (bd.length){
+    var wrap = el('div');
+    wrap.style.cssText = 'padding:12px 18px 4px';
+    wrap.appendChild(cell_(p.pos + ' BREAKDOWN',
+      'display:block;font-size:8px;font-weight:900;letter-spacing:1.2px;color:#8a939c;margin-bottom:7px'));
+    var g = el('div');
+    g.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e8ecf0';
+    bd.forEach(function(x){
+      var d = el('div');
+      d.style.cssText = 'background:#fff;padding:9px 10px';
+      d.appendChild(cell_(x[0] === '' ? '\u2013' : String(x[0]),
+        'display:block;font-size:16px;font-weight:900;color:#0C2340;letter-spacing:-.4px'));
+      d.appendChild(cell_(x[1],
+        'display:block;font-size:7px;font-weight:800;letter-spacing:.8px;color:#8a939c;margin-top:3px'));
+      g.appendChild(d);
+    });
+    wrap.appendChild(g);
+    card.appendChild(wrap);
+  }
+
+  /* ---- set pieces ---- */
+  var sp = setPieces_(p);
+  if (sp.length){
+    var spw = el('div');
+    spw.style.cssText = 'padding:12px 18px 4px';
+    spw.appendChild(cell_('SET PIECES',
+      'display:block;font-size:8px;font-weight:900;letter-spacing:1.2px;color:#8a939c;margin-bottom:7px'));
+    var sr = el('div');
+    sr.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap';
+    sp.forEach(function(x){
+      sr.appendChild(cell_(x[0],
+        'font-size:9px;font-weight:800;padding:5px 9px;background:' + (x[1] ? '#FFF4D6' : '#f2f4f7')
+        + ';color:' + (x[1] ? '#8A6A0C' : '#a3adb7')));
+    });
+    spw.appendChild(sr);
+    card.appendChild(spw);
+  }
+
+  /* ---- ownership ---- */
+  if (p.owner){
+    var kit = kitFor(p.owner);
+    var own = el('div');
+    own.style.cssText = 'margin:14px 18px 0;background:' + kit.main + ';color:' + kit.text
+      + ';padding:11px 14px';
+    own.appendChild(cell_('FOR ' + p.owner.toUpperCase(),
+      'display:block;font-size:9px;font-weight:900;letter-spacing:1.3px;opacity:.8'));
+    var st = el('div');
+    st.style.cssText = 'display:flex;gap:20px;margin-top:6px;flex-wrap:wrap';
+    ownerStats_(p).forEach(function(x){
+      var d = el('div');
+      d.appendChild(cell_(x[0],
+        'display:block;font-size:17px;font-weight:900;letter-spacing:-.4px'));
+      d.appendChild(cell_(x[1],
+        'display:block;font-size:8px;font-weight:800;letter-spacing:1px;opacity:.75;margin-top:1px'));
+      st.appendChild(d);
+    });
+    own.appendChild(st);
+    card.appendChild(own);
+  }
+
+  var foot = el('div');
+  foot.style.cssText = 'padding:12px 18px 16px;text-align:center;font-size:10px;'
+    + 'font-weight:700;letter-spacing:1px;color:#a3adb7';
+  foot.textContent = PC_SEASON === 'prior' ? 'LAST SEASON  \u00b7  ESC TO CLOSE'
+    : 'THIS SEASON  \u00b7  ESC TO CLOSE';
+  card.appendChild(foot);
+
+  veil.appendChild(card);
+  document.body.appendChild(veil);
+  document.addEventListener('keydown', pcKeys);
+}
+
+/* Any row carrying a player's name opens the card. One helper rather
+   than five, so a row added later is one line away from working. */
+function clickable_(row, id, name){
+  if (!name && !id) return;
+  row.style.cursor = 'pointer';
+  row.addEventListener('click', function(e){
+    if (e.target && e.target.tagName === 'BUTTON') return;
+    openPlayer(id, name);
+  });
+}
+
+function pcKeys(e){ if (e.key === 'Escape') closePlayer(); }
+function closePlayer(){
+  var v = document.getElementById('pc-veil');
+  if (v && v.parentNode) v.parentNode.removeChild(v);
+  document.removeEventListener('keydown', pcKeys);
+}
+
+/* Everything known about a player, from whichever season is selected.
+
+   `val` takes both a live column name and an archive header so the
+   same card works off two differently-shaped sources without the
+   caller caring which is loaded. */
+function playerRecord_(id, name){
+  var live = null;
+  (DATA.players || []).forEach(function(x){
+    if (live) return;
+    if (id && String(x.id) === String(id)) live = x;
+    else if (!id && name && x.web === name) live = x;
+  });
+
+  var pid = live ? String(live.id) : (id ? String(id) : '');
+  var nm  = (live && live.web) || name || '';
+
+  function look(set){
+    if (!set) return null;
+    return (pid && set.byId[pid]) || set.byName[String(nm).toLowerCase()] || null;
+  }
+  var now   = look(DATA.stats);
+  var prior = look(DATA.prior);
+
+  if (!live && !now && !prior) return null;
+
+  var use = PC_SEASON === 'prior' ? prior : now;
+  var any = use || now || prior;
+
+  return {
+    id: pid,
+    web: nm || (any && any.web) || '',
+    pos: (any && any.pos) || (live && live.pos) || '',
+    club: (any && any.club) || (live && live.club) || '',
+    clubName: (any && any.club) || (live && live.club) || '',
+    owner: (live && live.team) || '',
+    hasPrior: !!prior,
+    /* liveKey is the snake_case name in RAW_Players, archiveKey the
+       Title Case one in the archive. Falls back to the transfer list
+       for the handful of fields that predate the full pull. */
+    val: function(liveKey, archiveKey){
+      var src = PC_SEASON === 'prior' ? prior : now;
+      if (src){
+        var v = src.get(PC_SEASON === 'prior' ? archiveKey : liveKey);
+        if (v !== undefined && v !== null && v !== '') return v;
+      }
+      if (PC_SEASON !== 'prior' && live){
+        var w = live[liveKey];
+        if (w !== undefined && w !== null) return w;
+      }
+      return '';
+    }
+  };
+}
+
+/* Amber under 100, red at zero, with the reason spelled out. */
+function availabilityBand_(p){
+  var chance = p.val('chance_of_playing_next_round', 'chance next round %');
+  var news = String(p.val('news', 'news') || '').trim();
+
+  var c = chance === '' || chance === null ? null : num(chance);
+  if (c === null && !news) return null;
+  if (c === 100 && !news) return null;
+
+  var red = c === 0;
+  var band = el('div');
+  band.style.cssText = 'background:' + (red ? '#C0392B' : '#E8A317') + ';color:#fff;'
+    + 'padding:8px 18px;display:flex;align-items:center;gap:9px';
+  band.appendChild(cell_(red ? '\u2715' : '\u26a0', 'font-size:14px;flex-shrink:0'));
+
+  var t = el('span');
+  t.style.cssText = 'flex:1;min-width:0';
+  t.appendChild(cell_(red ? 'UNAVAILABLE' : (c === null ? 'DOUBTFUL' : c + '% CHANCE'),
+    'display:block;font-size:9px;font-weight:900;letter-spacing:1.2px;opacity:.85'));
+  if (news) t.appendChild(cell_(news,
+    'display:block;font-size:12px;font-weight:700;margin-top:1px'));
+  band.appendChild(t);
+  return band;
+}
+
+/* Eight stats that mean something for the position being looked at.
+   Bonus is on every one of them. */
+function breakdownFor_(p){
+  function v(a, b){ return p.val(a, b); }
+  var common = [[v('bonus','bonus'), 'BONUS'], [v('starts','starts'), 'STARTS']];
+
+  if (p.pos === 'GK'){
+    return [[v('saves','saves'),'SAVES'], [v('clean_sheets','clean sheets'),'CLEAN SHEETS'],
+            [v('goals_conceded','goals conceded'),'CONCEDED'], [v('penalties_saved','pens saved'),'PENS SAVED']]
+           .concat(common)
+           .concat([[v('bps','bps'),'BPS'], [v('expected_goals_conceded','xgc'),'xGC']]);
+  }
+  if (p.pos === 'DEF'){
+    return [[v('clean_sheets','clean sheets'),'CLEAN SHEETS'], [v('goals_conceded','goals conceded'),'CONCEDED'],
+            [v('goals_scored','goals'),'GOALS'], [v('assists','assists'),'ASSISTS']]
+           .concat(common)
+           .concat([[v('clearances_blocks_interceptions','cbi'),'CBI'], [v('defensive_contribution','def contribution'),'DEF CONTRIB']]);
+  }
+  return [[v('goals_scored','goals'),'GOALS'], [v('assists','assists'),'ASSISTS'],
+          [v('expected_goals','xg'),'xG'], [v('expected_assists','xa'),'xA']]
+         .concat(common)
+         .concat([[v('minutes','minutes'),'MINUTES'], [v('threat','threat'),'THREAT']]);
+}
+
+/* Who takes what. Only shown when the API says someone is on them. */
+function setPieces_(p){
+  var out = [];
+  [['penalties_order','penalties order','PENALTIES'],
+   ['corners_and_indirect_freekicks_order','corners order','CORNERS'],
+   ['direct_freekicks_order','direct fk order','FREE KICKS']].forEach(function(x){
+    var v = p.val(x[0], x[1]);
+    if (v === '' || v === null) return;
+    var n = num(v);
+    if (!n) return;
+    out.push([x[2] + '  ' + ordinal(n), true]);
+  });
+  return out;
+}
+
+function ownerStats_(p){
+  var out = [];
+  var d = DATA.byLeague[LEAGUE.key];
+  var sq = d && d.squads;
+  var row = null;
+  if (sq) sq.players.forEach(function(x){
+    if (!row && x.manager === p.owner && x.name === p.web) row = x;
+  });
+
+  if (row){
+    if (row.fee !== null) out.push([money_(row.fee), 'FEE']);
+    out.push([String(row.totalPts), 'SCORED']);
+    out.push([String(row.xiPts), 'FOR TEAM']);
+    out.push([String(row.starts), 'STARTS']);
+    if (row.fee) out.push([(row.xiPts / row.fee).toFixed(1), 'PTS PER \u00a3M']);
+  } else {
+    out.push([String(p.val('total_points','total points') || 0), 'SCORED']);
+  }
+  return out;
+}
 
 /* =====================================================================
    LIGHTBOX
@@ -5706,6 +6800,7 @@ function renderPlayers(){
     list.slice(0, plLimit).forEach(function(p){
       var row = el('div','plr');
       row.appendChild(playerPhoto(p.id, p.web, 24));
+      clickable_(row, p.id, p.web);
       var nm = el('span','pl-nm', p.web); row.appendChild(nm);
       var pw = el('span'); pw.style.width = '30px';
       var pill = el('span','pp', p.pos);
@@ -6018,13 +7113,14 @@ function portalAvailable_(host, page){
       return;
     }
 
-    rows.slice(0, 60).forEach(function(p){
+    rows.slice(0, 20).forEach(function(p){
       var row = el('div');
       row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:8px 0;'
         + 'border-bottom:1px solid #303030';
       var ph = playerPhoto(p.id, p.web, 28);
       ph.style.flexShrink = '0';
       row.appendChild(ph);
+      clickable_(row, p.id, p.web);
 
       var t = el('span');
       t.style.cssText = 'flex:1;min-width:0';
@@ -6044,8 +7140,8 @@ function portalAvailable_(host, page){
       list.appendChild(row);
     });
 
-    if (rows.length > 60){
-      var more = el('div', null, rows.length - 60 + ' more - narrow the search');
+    if (rows.length > 20){
+      var more = el('div', null, rows.length - 20 + ' more - search or filter to narrow it');
       more.style.cssText = 'padding:12px 0;text-align:center;color:#6b6b6b;font-size:10px';
       list.appendChild(more);
     }
@@ -6396,6 +7492,7 @@ function portalFeed_(host){
       var ph = playerPhoto(r.elementId, r.player, 30);
       ph.style.flexShrink = '0';
       row.appendChild(ph);
+      clickable_(row, r.elementId, r.player);
 
       var t = el('span');
       t.style.cssText = 'flex:1;min-width:0';
@@ -6524,6 +7621,7 @@ function portalSquads_(wrap){
           var pp = playerPhoto(null, p.name, 20);
           pp.style.flexShrink = '0';
           row.appendChild(pp);
+          clickable_(row, null, p.name);
         } else {
           var dot = el('span');
           dot.style.cssText = 'width:20px;height:20px;border-radius:50%;flex-shrink:0;'
