@@ -30,7 +30,10 @@ img{display:block;max-width:100%}
 .nav a{font-size:14px;font-weight:500;color:#3d4852;padding:8px 18px;text-decoration:none;border-left:3px solid transparent;cursor:pointer}
 .nav a:hover{background:#f7f9fb}
 .nav a.on{font-weight:700;color:var(--rsm-azure);border-left-color:var(--rsm-azure)}
-.side-panel{margin-top:auto;border-top:1px solid var(--line);padding:15px 18px 18px}
+/* it used to be margin-top:auto, which pins it to the bottom of a
+   full height column - so it floated away from the nav and sat
+   halfway down an empty sidebar */
+.side-panel{margin-top:18px;border-top:1px solid var(--line);padding:15px 18px 18px}
 .sp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
 .sp-title{font-size:10px;font-weight:800;letter-spacing:1.1px}
 .sp-rule{height:3px;width:26px;margin-bottom:11px}
@@ -109,18 +112,26 @@ img{display:block;max-width:100%}
 /* An aspect ratio, not a height. At a fixed 250px the image was
    cropped to whatever the window happened to be, so the subject
    drifted off the side as the browser resized. */
-.hero{position:relative;aspect-ratio:21/9;min-height:190px;max-height:340px;
+/* WIDTH 100%, AND NO MAX HEIGHT
+
+   aspect-ratio with a capped height makes the browser shrink the
+   WIDTH to keep the ratio - so the banner sat at 793px inside a
+   1048px column and looked like the header did not fit the page.
+   The ratio governs the height; the width is simply the column. */
+.hero{position:relative;width:100%;aspect-ratio:21/9;min-height:200px;
       background:linear-gradient(115deg,#0C2340 0%,#123A5C 45%,#0091DA 100%);overflow:hidden}
 .hero.no-hero{background:linear-gradient(115deg,#0C2340 0%,#123A5C 45%,#0091DA 100%)}
-.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+/* the banner and the champion artwork both fill their box without
+   cropping - see fitImage_, which does the work for both */
 .hero-slot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 .hero-slot div{border:2px dashed rgba(255,255,255,.28);padding:16px 26px;text-align:center;color:rgba(255,255,255,.4);font-size:10px;font-weight:600;letter-spacing:1.2px}
 /* dark where the words are, clear where the picture is. A flat wash
    over the whole thing greys out the photograph to make the text
    readable, which is a poor trade on the page people see first. */
-.hero-scrim{position:absolute;inset:0;background:linear-gradient(180deg,
+.hero-scrim{position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,
   rgba(9,28,50,0) 30%, rgba(9,28,50,.55) 62%, rgba(9,28,50,.88) 100%)}
-.hero-copy{position:absolute;left:0;right:0;bottom:0;padding:0 26px 24px}
+.hero-copy{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:0 26px 24px}
 .hero-kicker{font-size:10px;font-weight:800;letter-spacing:1.6px;color:var(--rsm-cyan);margin-bottom:9px}
 .hero-title{font-size:clamp(22px,3.4vw,38px);font-size:33px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1.05}
 .hero-sub{font-size:13px;color:rgba(255,255,255,.75);line-height:1.5;margin:10px 0 16px;max-width:430px}
@@ -357,11 +368,15 @@ img{display:block;max-width:100%}
 .medal{width:3px;height:16px;display:inline-block;vertical-align:middle}
 
 /* ---------- PLAYERS ---------- */
-.pl-mast{background:#37003C;display:flex;align-items:stretch}
-.pl-mast .l{flex:1;padding:18px 20px 16px}
-.pl-mast .k{font-size:9px;font-weight:800;letter-spacing:1.6px;color:#04F5FF}
+.pl-mast{background:#37003C;display:flex;align-items:stretch;flex-wrap:wrap}
+.pl-mast .l{flex:1;min-width:240px;padding:18px 20px 16px}
+.pl-mast .k{font-size:9px;font-weight:800;letter-spacing:1.8px;color:#00D9C0}
 .pl-mast h2{font-size:27px;font-weight:900;color:#fff;letter-spacing:-.9px;line-height:1.05;margin-top:3px}
 .pl-mast .s{font-size:12px;color:rgba(255,255,255,.6);margin-top:4px}
+/* the spotlight, where a dashed IMAGE SLOT used to sit */
+.pl-spot{width:290px;flex-shrink:0;background:rgba(255,255,255,.07);padding:14px 17px;
+         display:flex;align-items:center;gap:12px;cursor:pointer;color:#fff}
+@media(max-width:760px){.pl-spot{width:100%}}
 .pl-slot{width:180px;flex-shrink:0;border-left:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;
   color:rgba(255,255,255,.4);font-size:9px;font-weight:700;letter-spacing:1px}
 .pl-trim{display:flex;height:4px}
@@ -660,6 +675,36 @@ function el(tag, cls, text){
   return e;
 }
 function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
+
+/* Fill a box with a picture without cropping it.
+
+   Two copies of the same image: a blurred one covering the box, and a
+   sharp one contained inside it. Cover alone crops whatever does not
+   fit the box, which turns a piece of artwork into a detail of a
+   piece of artwork. Contain alone leaves bare bars down the sides.
+
+   Used by the home banner and the champion artwork, which is why it
+   is a helper rather than the same eight lines twice.               */
+function fitImage_(box, path, onGone){
+  box.style.position = 'relative';
+  box.style.overflow = 'hidden';
+
+  var bg = imgTry(path, null);
+  bg.alt = '';
+  bg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;'
+    + 'filter:blur(22px) saturate(1.15) brightness(.7);transform:scale(1.12)';
+  box.appendChild(bg);
+
+  var fg = imgTry(path, function(){
+    if (bg.parentNode) bg.parentNode.removeChild(bg);
+    if (onGone) onGone();
+  });
+  fg.alt = '';
+  fg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;'
+    + 'object-fit:contain;object-position:center';
+  box.appendChild(fg);
+  return fg;
+}
 
 /* An image that tries each file type in turn, and does something
    sensible if none of them exist.
@@ -2198,17 +2243,19 @@ function paintHome(host){
   var track = homeTracker_();
   if (track) pad.appendChild(track);
 
-  pad.appendChild(homeHeading_('Competitions', 'where each one stands'));
-  pad.appendChild(homeComps_(played));
-
+  /* the two small panels sit above the competitions, not below them -
+     they are the warm bit and they belong near the top */
   var lower = el('div');
   lower.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));'
-    + 'gap:10px;margin-top:20px';
+    + 'gap:10px;margin-bottom:22px';
   var motm = homeMotm_();
   if (motm) lower.appendChild(motm);
   var last = homeLastGw_(played);
   if (last) lower.appendChild(last);
   if (lower.children.length) pad.appendChild(lower);
+
+  pad.appendChild(homeHeading_('Competitions', 'where each one stands'));
+  pad.appendChild(homeComps_(played));
 }
 
 function homeHeading_(title, sub){
@@ -2230,12 +2277,11 @@ function homeHeading_(title, sub){
 function homeHero_(played){
   var hero = el('div','hero');
 
-  var im = imgTry(CONFIG.img.hero, function(){
+  fitImage_(hero, CONFIG.img.hero, function(){
     var slot = el('div','hero-slot');
     slot.appendChild(el('div', null, 'HERO IMAGE SLOT'));
     hero.insertBefore(slot, hero.firstChild);
   });
-  hero.appendChild(im);
 
   var scrim = el('div','hero-scrim');
   hero.appendChild(scrim);
@@ -2261,8 +2307,9 @@ function homeHero_(played){
     var margin = DATA.table.length > 1 ? (t.points - DATA.table[1].points) : 0;
     var complete = played >= CONFIG.totalGameweeks;
 
-    text.appendChild(el('div','hero-kicker',
-      txt('home.hero.kicker', 'GAMEWEEK') + ' ' + played + '  \u00b7  ' + LEAGUE.name.toUpperCase()));
+    text.appendChild(el('div','hero-kicker', complete
+      ? txt('home.hero.champkicker', 'CHAMPIONS') + '  \u00b7  ' + CONFIG.season
+      : txt('home.hero.kicker', 'GAMEWEEK') + ' ' + played + '  \u00b7  ' + LEAGUE.name.toUpperCase()));
     text.appendChild(el('div','hero-title', t.name + ' '
       + (complete ? txt('home.hero.champion', 'takes the title')
                   : txt('home.hero.leading', 'leads the way'))));
@@ -2272,9 +2319,12 @@ function homeHero_(played){
         + (played === 1 ? '' : 's') + '.'));
   }
 
-  var btn = el('a','hero-btn', played
-    ? txt('home.hero.button', 'View full standings')
-    : txt('home.pre.button', 'Open the transfer portal'));
+  /* 'hero-btn' has no styles, so the button rendered as a line of
+     plain text. The class is 'hero-cta', and the text keys are
+     .cta to match USER_TEXT. */
+  var btn = el('a','hero-cta', played
+    ? txt('home.hero.cta', 'View full standings')
+    : txt('home.pre.cta', 'Open the transfer portal'));
   btn.addEventListener('click', function(){ go(played ? 'league' : 'portal'); });
   text.appendChild(btn);
   body.appendChild(text);
@@ -2353,13 +2403,17 @@ function homeTiles_(played){
    until it has been won. */
 function homeComps_(played){
   var grid = el('div');
-  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:10px';
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:10px';
 
   CONFIG.comps.forEach(function(c){
     var st = compState_(c, played);
 
+    /* The lower half is white and so is the page, so without a border
+       the card appears to stop at the colour and the status text below
+       reads as loose copy rather than part of the block. */
     var card = el('div');
-    card.style.cssText = 'border-radius:3px;overflow:hidden;cursor:pointer;background:' + c.colour;
+    card.style.cssText = 'border-radius:3px;overflow:hidden;cursor:pointer;'
+      + 'border:0.5px solid #e3e8ee;background:' + c.colour;
     card.addEventListener('click', function(){ go(compRoute_(c.key)); });
 
     var head = el('div');
@@ -5793,10 +5847,13 @@ function holderCard_(label, colour, imgKey, name){
     'font-size:9px;font-weight:900;letter-spacing:1.5px;color:#fff'));
   card.appendChild(head);
 
+  /* an aspect ratio, not a 92px letterbox - the artwork is a picture
+     of somebody, not a banner */
   var art = el('div');
-  art.style.cssText = 'height:92px;background:#EEF2F6;display:flex;flex-direction:column;'
-    + 'align-items:center;justify-content:center;border-bottom:0.5px solid #e3e6ea;'
-    + 'font-size:8px;font-weight:700;letter-spacing:.8px;color:#a3adb7;overflow:hidden';
+  art.style.cssText = 'aspect-ratio:16/10;background:#EEF2F6;display:flex;'
+    + 'flex-direction:column;align-items:center;justify-content:center;'
+    + 'border-bottom:0.5px solid #e3e6ea;font-size:8px;font-weight:700;'
+    + 'letter-spacing:.8px;color:#a3adb7;overflow:hidden';
   /* The card shows the season it has artwork for, not the season the
      site happens to be in. Asking for 2627 in August 2026 will always
      miss - nobody has won anything yet - so it falls back to the most
@@ -5804,18 +5861,16 @@ function holderCard_(label, colour, imgKey, name){
 
      Otherwise the page reads as broken when it is simply early. */
   var art2 = seasonWithArt_(imgKey);
-  art.appendChild(imgTry(CONFIG.img.champion(imgKey, art2.season), function(){
+  fitImage_(art, CONFIG.img.champion(imgKey, art2.season), function(){
     art.textContent = 'CHAMPION ARTWORK';
-  }));
+  });
   if (art2.old){
     var tag = el('div', null, art2.label);
-    tag.style.cssText = 'position:absolute;left:0;bottom:0;background:rgba(12,35,64,.72);'
-      + 'color:#fff;font-size:8px;font-weight:800;letter-spacing:1.1px;padding:3px 7px';
-    art.style.position = 'relative';
+    tag.style.cssText = 'position:absolute;left:0;bottom:0;z-index:2;'
+      + 'background:rgba(12,35,64,.72);color:#fff;font-size:8px;font-weight:800;'
+      + 'letter-spacing:1.1px;padding:3px 7px';
     art.appendChild(tag);
   }
-  var ai = art.firstChild;
-  if (ai && ai.style) ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
   card.appendChild(art);
 
   var foot = el('div');
@@ -6761,15 +6816,46 @@ function bigNote_(text){
 var plPos = 'ALL', plOwn = 'ALL', plQ = '', plSort = 'pts', plLimit = 60;
 var PPC = { GK:['#eef6ff','#1d4ed8'], DEF:['#effaf1','#15803d'], MID:['#fffbeb','#a16207'], FWD:['#fff1f3','#be123c'] };
 
+/* =====================================================================
+   PLAYERS
+
+   The reference view for the whole season. The Portal owns draft
+   night; this is where you come to look somebody up in March.
+
+   TWO THINGS THIS REBUILD FIXES
+
+   The columns were every one a fixed pixel width with nothing
+   flexible, so the table stopped at about 550px and the right half of
+   the page was empty. Numbers want fixed widths; the name and the
+   owner want the room that is left.
+
+   And the masthead carried a dashed box reading IMAGE SLOT that
+   pointed at nothing and never had. It is now a spotlight on whoever
+   is actually leading, which needs no artwork and changes as the
+   season runs.
+   ===================================================================== */
+
+var PL_POS = 'ALL', PL_OWN = 'ALL', PL_SORT = 'pts', PL_Q = '';
+var PL_SHOW = 60;
+
 function renderPlayers(){
   var host = document.getElementById('p-players');
   if (loaded.players) return;
   if (!DATA.players || !DATA.players.length){
-    clear(host); host.appendChild(el('div','err','Could not load the Transfer Player List sheet.')); return;
+    clear(host);
+    host.appendChild(el('div','err',
+      txt('error.sheet', 'Could not load the Transfer Player List sheet.')));
+    return;
   }
   loaded.players = true;
+  paintPlayers(host);
+}
+
+function paintPlayers(host){
   clear(host);
 
+  /* rank within position - 130 points is excellent for a defender and
+     ordinary for a forward, and the raw number says neither */
   var rank = {};
   ['GK','DEF','MID','FWD'].forEach(function(pp){
     DATA.players.filter(function(p){ return p.pos === pp; })
@@ -6777,161 +6863,306 @@ function renderPlayers(){
       .forEach(function(p, i){ rank[p.id] = i + 1; });
   });
 
+  host.appendChild(playersMast_());
+
+  var trim = el('div','pl-trim');
+  ['#00D9C0','#00FF87','#E90052'].forEach(function(c){
+    var sp = el('span');
+    sp.style.cssText = 'flex:1;background:' + c;
+    trim.appendChild(sp);
+  });
+  host.appendChild(trim);
+
+  var bar = el('div');
+  bar.style.cssText = 'padding:13px 18px 11px;display:flex;gap:9px;align-items:center;'
+    + 'flex-wrap:wrap;border-bottom:0.5px solid #e3e8ee';
+  host.appendChild(bar);
+
+  var wrap = el('div');
+  wrap.style.cssText = 'overflow-x:auto';
+  var tbl = el('div');
+  tbl.style.cssText = 'min-width:900px';
+  wrap.appendChild(tbl);
+  host.appendChild(wrap);
+
+  /* ---- filters ---- */
+  var box = el('div');
+  box.style.cssText = 'flex:1;min-width:180px;max-width:340px;border:1px solid #dbe2e9;'
+    + 'padding:7px 11px;display:flex;align-items:center';
+  var inp = document.createElement('input');
+  inp.placeholder = 'Search player or club';
+  inp.value = PL_Q;
+  inp.style.cssText = 'border:none;outline:none;font:inherit;font-size:12px;'
+    + 'width:100%;background:transparent;color:#0C2340';
+  box.appendChild(inp);
+  bar.appendChild(box);
+
+  function pills(vals, current, colour, onPick){
+    var g = el('div');
+    g.style.cssText = 'display:flex;gap:3px;flex-wrap:wrap';
+    vals.forEach(function(v){
+      var on = current === v[0];
+      var b = el('button', null, v[1]);
+      b.style.cssText = 'font:inherit;font-size:9px;font-weight:800;letter-spacing:.5px;'
+        + 'padding:6px 9px;cursor:pointer;border:1px solid '
+        + (on ? 'transparent' : '#dbe2e9') + ';background:' + (on ? colour : '#fff')
+        + ';color:' + (on ? '#fff' : '#5a6570');
+      b.addEventListener('click', function(){ onPick(v[0]); });
+      g.appendChild(b);
+    });
+    return g;
+  }
+
+  bar.appendChild(pills([['ALL','ALL'],['GK','GK'],['DEF','DEF'],['MID','MID'],['FWD','FWD']],
+    PL_POS, '#37003C', function(v){ PL_POS = v; PL_SHOW = 60; paintPlayers(host); }));
+  bar.appendChild(pills([['ALL','ALL'],['FREE','FREE'],['OWNED','OWNED']],
+    PL_OWN, '#00A85A', function(v){ PL_OWN = v; PL_SHOW = 60; paintPlayers(host); }));
+
+  var right = el('div');
+  right.style.cssText = 'margin-left:auto;display:flex;align-items:center;gap:8px';
+  var count = el('span');
+  count.style.cssText = 'font-size:10px;color:#8a939c;white-space:nowrap';
+  right.appendChild(count);
+  right.appendChild(pills([['pts','PTS'],['ppg','PPG'],['val','VALUE']],
+    PL_SORT, '#E90052', function(v){ PL_SORT = v; paintPlayers(host); }));
+  bar.appendChild(right);
+
+  /* ---- table ---- */
+  var COLS = [
+    ['',        'width:28px'],
+    ['PLAYER',  'flex:1.6;min-width:132px'],
+    ['POS',     'width:40px'],
+    ['RNK',     'width:34px;text-align:right'],
+    ['CLUB',    'width:38px'],
+    ['FEE',     'width:44px;text-align:right'],
+    ['PTS',     'width:40px;text-align:right'],
+    ['PPG',     'width:34px;text-align:right'],
+    ['G',       'width:30px;text-align:right'],
+    ['A',       'width:30px;text-align:right'],
+    ['CS',      'width:30px;text-align:right'],
+    ['BON',     'width:34px;text-align:right'],
+    ['VAL',     'width:44px;text-align:right'],
+    ['OWNER',   'flex:1;min-width:92px;padding-left:12px']
+  ];
+
+  var head = el('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 18px 8px;'
+    + 'border-bottom:1px solid #dbe2e9;font-size:8px;font-weight:800;'
+    + 'letter-spacing:.9px;color:#8a939c';
+  COLS.forEach(function(c){ head.appendChild(cell_(c[0], c[1])); });
+  tbl.appendChild(head);
+
+  var body = el('div');
+  tbl.appendChild(body);
+
+  var POSCOL = { GK:['#eef6ff','#1d4ed8'], DEF:['#effaf1','#15803d'],
+                 MID:['#fffbeb','#a16207'], FWD:['#fff1f3','#be123c'] };
+
+  function draw(){
+    clear(body);
+
+    var rows = DATA.players.filter(function(p){
+      if (PL_POS !== 'ALL' && p.pos !== PL_POS) return false;
+      if (PL_OWN === 'FREE' && p.team) return false;
+      if (PL_OWN === 'OWNED' && !p.team) return false;
+      if (PL_Q && (p.web + ' ' + p.club).toLowerCase().indexOf(PL_Q) < 0) return false;
+      return true;
+    });
+
+    rows.sort(function(a,b){
+      if (PL_SORT === 'ppg') return b.ppg - a.ppg;
+      if (PL_SORT === 'val') return playerValue_(b) - playerValue_(a);
+      return b.pts - a.pts;
+    });
+
+    count.textContent = rows.length + ' player' + (rows.length === 1 ? '' : 's');
+
+    if (!rows.length){
+      var n = el('div', null, 'No players match those filters');
+      n.style.cssText = 'padding:34px;text-align:center;color:#a3adb7;font-size:12px';
+      body.appendChild(n);
+      return;
+    }
+
+    rows.slice(0, PL_SHOW).forEach(function(p){
+      body.appendChild(playerRow_(p, rank, COLS, POSCOL));
+    });
+
+    if (rows.length > PL_SHOW){
+      var more = el('button', null,
+        'Show ' + Math.min(60, rows.length - PL_SHOW) + ' more  \u00b7  '
+        + (rows.length - PL_SHOW) + ' left');
+      more.style.cssText = 'display:block;width:100%;font:inherit;font-size:11px;'
+        + 'font-weight:800;padding:12px;cursor:pointer;background:#f7f9fb;'
+        + 'border:none;border-top:0.5px solid #e3e8ee;color:#37003C';
+      more.addEventListener('click', function(){ PL_SHOW += 60; draw(); });
+      body.appendChild(more);
+    }
+  }
+
+  inp.addEventListener('input', function(){
+    PL_Q = inp.value.toLowerCase();
+    PL_SHOW = 60;
+    draw();
+  });
+  draw();
+}
+
+/* Points per million. The actual question in a money draft is whether
+   somebody was worth what they cost. */
+function playerValue_(p){
+  var fee = num(p.fee);
+  return fee > 0 ? p.pts / fee : 0;
+}
+
+function playerRow_(p, rank, COLS, POSCOL){
+  var chance = playerChance_(p);
+  var news = playerNews_(p);
+  var gone = chance === 0;
+  var doubt = chance !== null && chance > 0 && chance < 100;
+
+  var row = el('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 18px;'
+    + 'border-bottom:0.5px solid #f2f4f7;cursor:pointer' + (gone ? ';opacity:.62' : '');
+
+  var ph = playerPhoto(p.id, p.web, 28);
+  ph.style.flexShrink = '0';
+  row.appendChild(ph);
+
+  /* name, with the availability flag in front of it where it cannot
+     be missed while scanning */
+  var nm = el('span');
+  nm.style.cssText = COLS[1][1] + ';display:flex;align-items:center;gap:5px;min-width:0';
+  if (gone || doubt){
+    var flag = el('span', null, '!');
+    flag.style.cssText = 'width:13px;height:13px;flex-shrink:0;display:flex;'
+      + 'align-items:center;justify-content:center;font-size:9px;font-weight:900;'
+      + 'color:#fff;background:' + (gone ? '#C0392B' : '#E8A317');
+    flag.title = news || (gone ? 'Unavailable' : chance + '% chance of playing');
+    nm.appendChild(flag);
+  }
+  nm.appendChild(cell_(p.web,
+    'font-size:13px;font-weight:800;color:#0C2340;white-space:nowrap;'
+    + 'overflow:hidden;text-overflow:ellipsis'));
+  row.appendChild(nm);
+
+  var pc = POSCOL[p.pos] || ['#f1f4f7','#5a6570'];
+  var pos = el('span');
+  pos.style.cssText = COLS[2][1];
+  pos.appendChild(cell_(p.pos,
+    'font-size:8px;font-weight:800;padding:2px 6px;background:' + pc[0] + ';color:' + pc[1]));
+  row.appendChild(pos);
+
+  var r = rank[p.id];
+  row.appendChild(cell_(r === undefined ? '' : String(r),
+    COLS[3][1] + ';font-size:12px;font-weight:900;color:'
+    + (r <= 3 ? '#0C2340' : '#c3ced8')));
+  row.appendChild(cell_(p.club, COLS[4][1] + ';font-size:10px;font-weight:700;color:#8a939c'));
+  row.appendChild(cell_(p.fee ? num(p.fee).toFixed(1) : '',
+    COLS[5][1] + ';font-size:11px;color:#5a6570'));
+  row.appendChild(cell_(String(p.pts),
+    COLS[6][1] + ';font-size:15px;font-weight:900;color:#0C2340'));
+  row.appendChild(cell_(p.ppg ? num(p.ppg).toFixed(1) : '',
+    COLS[7][1] + ';font-size:11px;color:#8a939c'));
+  row.appendChild(cell_(String(p.g === undefined ? '' : p.g),
+    COLS[8][1] + ';font-size:11px;color:#8a939c'));
+  row.appendChild(cell_(String(p.a === undefined ? '' : p.a),
+    COLS[9][1] + ';font-size:11px;color:#8a939c'));
+  row.appendChild(cell_(String(p.cs === undefined ? '' : p.cs),
+    COLS[10][1] + ';font-size:11px;color:#8a939c'));
+  row.appendChild(cell_(String(p.bonus === undefined ? '' : p.bonus),
+    COLS[11][1] + ';font-size:11px;color:#8a939c'));
+
+  var val = playerValue_(p);
+  row.appendChild(cell_(val ? val.toFixed(1) : '',
+    COLS[12][1] + ';font-size:12px;font-weight:800;color:#E90052'));
+
+  /* "Free agent" in green rather than an empty cell - on draft night
+     that is the most important word on the page */
+  row.appendChild(cell_(p.team || 'Free agent',
+    COLS[13][1] + ';font-size:12px;font-weight:700;color:'
+    + (p.team ? '#0C2340' : '#00A85A')
+    + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis'));
+
+  clickable_(row, p.id, p.web);
+  return row;
+}
+
+/* Chance of playing, from the raw sheet where it exists. Null means
+   the column is not there yet rather than the player being fit. */
+function playerChance_(p){
+  var st = DATA.stats && (DATA.stats.byCode[String(p.code || '')]
+    || DATA.stats.byId[String(p.id)]);
+  if (!st) return null;
+  var v = st.get('chance_of_playing_next_round');
+  if (v === undefined || v === null || v === '') return null;
+  return num(v);
+}
+
+function playerNews_(p){
+  var st = DATA.stats && (DATA.stats.byCode[String(p.code || '')]
+    || DATA.stats.byId[String(p.id)]);
+  if (!st) return '';
+  return String(st.get('news') || '').trim();
+}
+
+/* =====================================================================
+   THE MASTHEAD
+
+   The spotlight replaces a dashed box that said IMAGE SLOT and pointed
+   at nothing. Whoever is top of the pile, live, with no artwork to
+   supply and something that changes as the season runs.
+   ===================================================================== */
+function playersMast_(){
   var mast = el('div','pl-mast');
+
   var L = el('div','l');
   L.appendChild(el('div','k','SEASON ' + CONFIG.season));
   L.appendChild(el('h2', null, 'Players'));
   L.appendChild(el('div','s','Every player in the game, ranked and priced.'));
   mast.appendChild(L);
-  var slot = el('div','pl-slot','IMAGE SLOT');
-  mast.appendChild(slot);
-  host.appendChild(mast);
 
-  var trim = el('div','pl-trim');
-  ['#04F5FF','#00FF87','#E90052'].forEach(function(c){
-    var sp = el('span'); sp.style.cssText = 'flex:1;background:'+c; trim.appendChild(sp);
-  });
-  host.appendChild(trim);
+  var top = DATA.players.slice().sort(function(a,b){ return b.pts - a.pts; })[0];
+  if (!top) return mast;
 
-  var filters = el('div','pl-filters');
-  var r1 = el('div'); r1.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:9px';
-  var srch = el('div','pl-search');
-  var inp = document.createElement('input');
-  inp.placeholder = 'Search player or club';
-  srch.appendChild(inp);
-  r1.appendChild(srch);
-  var pills = el('div','pl-pills');
-  ['ALL','GK','DEF','MID','FWD'].forEach(function(v){
-    var b = document.createElement('button'); b.textContent = v; b.setAttribute('data-p', v);
-    if (v === 'ALL') b.className = 'on';
-    pills.appendChild(b);
-  });
-  r1.appendChild(pills);
-  filters.appendChild(r1);
+  var cc = clubColour(top.club);
+  var spot = el('div','pl-spot');
 
-  var r2 = el('div'); r2.style.cssText = 'display:flex;gap:6px;align-items:center';
-  var owns = el('div','pl-pills');
-  ['ALL','AVAILABLE','OWNED'].forEach(function(v){
-    var b = document.createElement('button'); b.textContent = v; b.setAttribute('data-o', v);
-    if (v === 'ALL') b.className = 'on';
-    owns.appendChild(b);
-  });
-  r2.appendChild(owns);
-  var spacer = el('span'); spacer.style.flex = '1'; r2.appendChild(spacer);
-  var count = el('span'); count.style.cssText = 'font-size:10px;font-weight:700;color:var(--ink3)';
-  r2.appendChild(count);
-  var sortLbl = el('span', null, 'Sort:'); sortLbl.style.cssText = 'font-size:10px;font-weight:600;color:var(--ink3)';
-  r2.appendChild(sortLbl);
-  var sorts = el('div','pl-sort'); sorts.style.display = 'flex'; sorts.style.gap = '3px';
-  [['pts','PTS'],['ppg','PPG'],['val','VALUE']].forEach(function(v){
-    var b = document.createElement('button'); b.textContent = v[1]; b.setAttribute('data-s', v[0]);
-    if (v[0] === 'pts') b.className = 'on';
-    sorts.appendChild(b);
-  });
-  r2.appendChild(sorts);
-  filters.appendChild(r2);
-  host.appendChild(filters);
+  var av = el('span');
+  av.style.cssText = 'width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;'
+    + 'background:' + cc.colour + ';color:' + cc.ink + ';border:2px solid rgba(255,255,255,.3);'
+    + 'display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900';
+  var ai = playerPhoto(top.id, top.web, 48);
+  while (ai.firstChild) av.appendChild(ai.firstChild);
+  if (!av.firstChild) av.textContent = top.web.substring(0,2).toUpperCase();
+  var img = av.firstChild;
+  if (img && img.style) img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+  spot.appendChild(av);
 
-  var tbl = el('div','pl-tbl');
-  var head = el('div','plh');
-  [['',24],['PLAYER',80],['POS',30],['RANK',30],['CLUB',30],['FEE',34],['PTS',30],['PPG',28],['G',18],['A',18],['CS',22],['BON',24],['VAL',30],['OWNER',70]]
-    .forEach(function(c){
-      var sp = el('span', null, c[0]);
-      sp.style.width = c[1] + 'px';
-      if (['PTS','PPG','G','A','CS','BON','VAL','FEE','RANK'].indexOf(c[0]) >= 0) sp.style.textAlign = 'right';
-      if (c[0] === 'OWNER') sp.style.textAlign = 'right';
-      head.appendChild(sp);
-    });
-  tbl.appendChild(head);
-  var rowsHost = el('div');
-  tbl.appendChild(rowsHost);
-  host.appendChild(tbl);
+  var t = el('span');
+  t.style.cssText = 'flex:1;min-width:0';
+  t.appendChild(cell_('LEADING SCORER',
+    'display:block;font-size:8px;font-weight:800;letter-spacing:1.4px;color:#00D9C0'));
+  t.appendChild(cell_(top.web,
+    'display:block;font-size:19px;font-weight:900;letter-spacing:-.5px;line-height:1.1;margin-top:2px'));
+  t.appendChild(cell_(top.pos + '  \u00b7  ' + top.club
+    + (top.team ? '  \u00b7  ' + top.team : '  \u00b7  free agent'),
+    'display:block;font-size:10px;color:rgba(255,255,255,.6);margin-top:1px'));
+  spot.appendChild(t);
 
-  var moreWrap = el('div','pl-more');
-  var moreBtn = document.createElement('button');
-  moreWrap.appendChild(moreBtn);
-  host.appendChild(moreWrap);
+  var n = el('span');
+  n.style.cssText = 'text-align:right;flex-shrink:0';
+  n.appendChild(cell_(String(top.pts),
+    'display:block;font-size:24px;font-weight:900;letter-spacing:-.8px'));
+  n.appendChild(cell_('POINTS',
+    'display:block;font-size:8px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.55)'));
+  spot.appendChild(n);
 
-  function paint(){
-    var list = DATA.players.filter(function(p){
-      if (plPos !== 'ALL' && p.pos !== plPos) return false;
-      if (plOwn === 'AVAILABLE' && p.team) return false;
-      if (plOwn === 'OWNED' && !p.team) return false;
-      if (plQ && (p.web + ' ' + p.club + ' ' + p.team).toLowerCase().indexOf(plQ) < 0) return false;
-      return true;
-    });
-    list.sort(function(a,b){
-      if (plSort === 'pts') return b.pts - a.pts;
-      if (plSort === 'ppg') return (b.pts/38) - (a.pts/38);
-      return (b.fee ? b.pts/b.fee : 0) - (a.fee ? a.pts/a.fee : 0);
-    });
-    count.textContent = list.length + ' players';
-    clear(rowsHost);
-    list.slice(0, plLimit).forEach(function(p){
-      var row = el('div','plr');
-      row.appendChild(playerPhoto(p.id, p.web, 24));
-      clickable_(row, p.id, p.web);
-      var nm = el('span','pl-nm', p.web); row.appendChild(nm);
-      var pw = el('span'); pw.style.width = '30px';
-      var pill = el('span','pp', p.pos);
-      var pc = PPC[p.pos] || ['#f2f4f7','#5a6570'];
-      pill.style.background = pc[0]; pill.style.color = pc[1];
-      pw.appendChild(pill); row.appendChild(pw);
-      var rk = el('span','pl-n', String(rank[p.id] || '-'));
-      rk.style.width='30px'; rk.style.fontWeight='700';
-      rk.style.color = (rank[p.id] || 99) <= 3 ? '#37003C' : 'var(--ink3)';
-      row.appendChild(rk);
-      var cl = el('span','pl-n', p.club); cl.style.width='30px'; cl.style.textAlign='left'; row.appendChild(cl);
-      var fee = el('span','pl-n', p.fee ? p.fee.toFixed(1) : '-'); fee.style.width='34px'; row.appendChild(fee);
-      var pts = el('span','pl-n', String(p.pts));
-      pts.style.cssText = 'width:30px;text-align:right;font-size:13px;font-weight:800;color:#37003C';
-      row.appendChild(pts);
-      [[ (p.pts/38).toFixed(1),28],[p.goals,18],[p.assists,18],[p.cs,22],[p.bonus||0,24]].forEach(function(c){
-        var sp = el('span','pl-n', String(c[0])); sp.style.width = c[1]+'px'; row.appendChild(sp);
-      });
-      var val = el('span','pl-n', p.fee ? (p.pts/p.fee).toFixed(1) : '-');
-      val.style.cssText = 'width:30px;text-align:right;font-weight:700;color:#E90052';
-      row.appendChild(val);
-      var own = el('span','pl-own');
-      var dot = el('i');
-      var kit = CONFIG.managers[p.team];
-      dot.style.background = p.team ? (kit ? kit.body : '#8a939c') : '#00A85A';
-      own.appendChild(dot);
-      var ot = el('span', null, p.team || 'Available');
-      ot.style.color = p.team ? 'var(--ink2)' : '#00A85A';
-      ot.style.whiteSpace='nowrap'; ot.style.overflow='hidden'; ot.style.textOverflow='ellipsis';
-      own.appendChild(ot);
-      row.appendChild(own);
-      rowsHost.appendChild(row);
-    });
-    if (list.length > plLimit){
-      moreBtn.textContent = 'Show more (' + (list.length - plLimit) + ' remaining)';
-      moreWrap.style.display = 'block';
-    } else {
-      moreWrap.style.display = 'none';
-    }
-  }
-
-  pills.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-p]'); if (!b) return;
-    pills.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
-    b.classList.add('on'); plPos = b.getAttribute('data-p'); plLimit = 60; paint();
-  });
-  owns.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-o]'); if (!b) return;
-    owns.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
-    b.classList.add('on'); plOwn = b.getAttribute('data-o'); plLimit = 60; paint();
-  });
-  sorts.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-s]'); if (!b) return;
-    sorts.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
-    b.classList.add('on'); plSort = b.getAttribute('data-s'); paint();
-  });
-  inp.addEventListener('input', function(){ plQ = inp.value.toLowerCase(); plLimit = 60; paint(); });
-  moreBtn.addEventListener('click', function(){ plLimit += 100; paint(); });
-
-  paint();
+  spot.addEventListener('click', function(){ openPlayer(top.id, top.web); });
+  mast.appendChild(spot);
+  return mast;
 }
+
 
 /* =====================================================================
    TRANSFER PORTAL
