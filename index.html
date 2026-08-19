@@ -141,8 +141,12 @@ img{display:block;max-width:100%}
 .tiles{background:var(--rsm-azure);display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 .tile{padding:15px 0 15px 22px}
 .tile+.tile{border-left:1px solid rgba(255,255,255,.25);padding-left:15px}
-.tile b{display:block;font-size:23px;font-weight:900;color:#fff;letter-spacing:-.7px}
-.tile span{display:block;font-size:9px;font-weight:600;letter-spacing:1px;color:rgba(255,255,255,.82);margin-top:3px}
+/* the markup is div.tv and div.tl, not b and span - styling the wrong
+   elements left the numbers inheriting the page's dark ink on an
+   azure bar, which is why they looked nothing like the button above */
+.tile .tv{display:block;font-size:23px;font-weight:900;color:#fff;letter-spacing:-.7px}
+.tile .tl{display:block;font-size:9px;font-weight:700;letter-spacing:1px;
+          color:rgba(255,255,255,.85);margin-top:3px}
 
 .sec{padding:22px 24px 26px}
 .sec-h{font-size:18px;font-weight:800;letter-spacing:-.4px;margin-bottom:14px}
@@ -6512,6 +6516,39 @@ function clickable_(row, id, name){
   });
 }
 
+/* Type playerCheck() in the console to see how the two seasons line
+   up. Written because "why is Haaland at Newcastle" took a round trip
+   to answer, and the answer was in the codes all along. */
+function playerCheck(){
+  var live = DATA.players || [];
+  var stats = DATA.stats, prior = DATA.prior;
+
+  console.log('player data');
+  console.log('  transfer list           ', live.length);
+  console.log('  with a code             ', live.filter(function(p){ return p.code; }).length);
+  console.log('  RAW_Players rows        ', stats ? Object.keys(stats.byId).length : 0);
+  console.log('  RAW_Players columns     ', stats ? Object.keys(stats.cols).length : 0,
+    stats && Object.keys(stats.cols).length < 40
+      ? '  *** looks like the old pull - re-run "Pull raw data"' : '');
+  console.log('  archive rows            ', prior ? Object.keys(prior.byId).length : 0);
+  console.log('  archive indexed by code ', prior ? Object.keys(prior.byCode).length : 0,
+    prior && !Object.keys(prior.byCode).length
+      ? '  *** no Code column found in the archive' : '');
+
+  var matched = 0, missing = [];
+  live.forEach(function(p){
+    var c = String(p.code || '');
+    if (c && prior && prior.byCode[c]) matched++;
+    else if (p.pts > 40) missing.push(p.web);
+  });
+  console.log('  matched to last season  ', matched);
+  if (missing.length){
+    console.log('  no archive row (40+ pts):', missing.length, missing.slice(0, 15));
+    console.log('    these show only this season, which is correct if they are new');
+  }
+  return { matched: matched, unmatched: missing.length };
+}
+
 function pcKeys(e){ if (e.key === 'Escape') closePlayer(); }
 function closePlayer(){
   var v = document.getElementById('pc-veil');
@@ -6547,24 +6584,37 @@ function playerRecord_(id, name){
 
      The code is permanent. It is what the photographs are keyed on
      too, for the same reason.                                       */
-  function look(set){
-    if (!set) return null;
-    if (code && set.byCode && set.byCode[code]) return set.byCode[code];
-    /* the live sheet alone may be indexed by id */
-    if (set === DATA.stats && pid && set.byId[pid]) return set.byId[pid];
-    return set.byName[String(nm).toLowerCase()] || null;
+  /* THE LIVE SHEET may be indexed by either. The ARCHIVE is matched on
+     code ALONE.
+
+     Falling back to a name match across seasons is how Haaland came
+     back as a Newcastle midfielder: the name found a row, the row was
+     somebody else, and the card showed the right name above the wrong
+     club with a straight face.
+
+     No last season beats the wrong last season. If the code does not
+     match, there is no second tab and nothing to mislead anybody. */
+  function lookLive(){
+    if (!DATA.stats) return null;
+    if (code && DATA.stats.byCode[code]) return DATA.stats.byCode[code];
+    if (pid && DATA.stats.byId[pid]) return DATA.stats.byId[pid];
+    return DATA.stats.byName[String(nm).toLowerCase()] || null;
   }
-  var now   = look(DATA.stats);
-  /* if the live sheet knows the code and the transfer list did not,
-     use that to reach the archive */
-  if (!code && now && now.code) {
-    code = String(now.code);
-    if (DATA.prior && DATA.prior.byCode && DATA.prior.byCode[code]) {
-      /* recompute with the code now known */
-    }
+  var now = lookLive();
+
+  /* the transfer list may not carry the code, but the raw sheet does */
+  if (!code && now && now.code) code = String(now.code);
+
+  var prior = (code && DATA.prior && DATA.prior.byCode)
+    ? (DATA.prior.byCode[code] || null) : null;
+
+  /* If the archive has no code column at all, an id match is the best
+     available and is flagged as such rather than trusted silently. */
+  var priorLoose = false;
+  if (!prior && DATA.prior && !Object.keys(DATA.prior.byCode || {}).length){
+    prior = (pid && DATA.prior.byId[pid]) || null;
+    priorLoose = !!prior;
   }
-  var prior = (code && DATA.prior && DATA.prior.byCode && DATA.prior.byCode[code])
-    ? DATA.prior.byCode[code] : look(DATA.prior);
 
   if (!live && !now && !prior) return null;
 
@@ -6579,6 +6629,7 @@ function playerRecord_(id, name){
     clubName: (any && any.club) || (live && live.club) || '',
     owner: (live && live.team) || '',
     hasPrior: !!prior,
+    priorLoose: priorLoose,
     /* liveKey is the snake_case name in RAW_Players, archiveKey the
        Title Case one in the archive. Falls back to the transfer list
        for the handful of fields that predate the full pull. */
