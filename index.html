@@ -787,7 +787,17 @@ function fetchSheet(league, key){
   }
   var url = sheetUrl(league, key);
   if (cache[url]) return Promise.resolve(cache[url]);
-  return fetch(url)
+
+  /* Google caches a published CSV hard, and so does the browser, so a
+     sheet cleared five minutes ago still comes back full. A stamp that
+     changes every minute makes each request look new without asking
+     for the same thing twice within the minute.
+
+     This is why fixtures kept appearing after they had been wiped -
+     nothing was wrong with the sheet, the dashboard was being handed
+     an old copy. */
+  var stamp = Math.floor(Date.now() / 60000);
+  return fetch(url + '&_=' + stamp, { cache: 'no-store' })
     .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
     .then(function(t){ var rows = parseCSV(t); cache[url] = rows; return rows; });
 }
@@ -6705,13 +6715,17 @@ function playerRecord_(id, name){
   var prior = (code && DATA.prior && DATA.prior.byCode)
     ? (DATA.prior.byCode[code] || null) : null;
 
-  /* If the archive has no code column at all, an id match is the best
-     available and is flagged as such rather than trusted silently. */
+  /* NO ID FALLBACK. NONE.
+
+     This used to say: if the archive has no code column, fall back to
+     matching on id. That is the original bug wearing a hat. Element
+     ids are reassigned every summer, so id 12 finds whoever holds it
+     now - which is how Haaland kept coming back from Newcastle.
+
+     If the codes are not readable the answer is no last season, and
+     playerCheck() will say why. A missing tab is a puzzle; a wrong
+     club is a lie.                                                  */
   var priorLoose = false;
-  if (!prior && DATA.prior && !Object.keys(DATA.prior.byCode || {}).length){
-    prior = (pid && DATA.prior.byId[pid]) || null;
-    priorLoose = !!prior;
-  }
 
   if (!live && !now && !prior) return null;
 
