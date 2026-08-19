@@ -6569,7 +6569,54 @@ function clickable_(row, id, name){
 /* Type playerCheck() in the console to see how the two seasons line
    up. Written because "why is Haaland at Newcastle" took a round trip
    to answer, and the answer was in the codes all along. */
-function playerCheck(){
+/* playerCheck('Haaland') dumps exactly what the card matched for one
+   player, from both sheets, side by side with their codes. Faster
+   than another round of guessing at a sheet I cannot read. */
+function playerCheck(who){
+  if (who) return playerTrace_(who);
+  return playerCheckAll_();
+}
+
+function playerTrace_(who){
+  var q = String(who).toLowerCase();
+  var live = (DATA.players || []).filter(function(p){
+    return String(p.web || '').toLowerCase().indexOf(q) >= 0; })[0];
+
+  console.log('trace: ' + who);
+  if (!live){ console.log('  not in the Transfer Player List'); return null; }
+
+  console.log('  TRANSFER LIST  id=' + live.id + '  code=' + (live.code || '(none)')
+    + '  ' + live.web + '  ' + live.pos + '  ' + live.club);
+
+  var code = String(live.code || '');
+  var raw = DATA.stats && (DATA.stats.byCode[code] || DATA.stats.byId[String(live.id)]);
+  console.log('  RAW_Players    ' + (raw
+    ? 'id=' + raw.id + '  code=' + raw.code + '  ' + raw.web + '  ' + raw.pos
+      + '  ' + raw.club + '  pts=' + raw.get('total_points')
+    : '(no row)'));
+
+  if (!code && raw && raw.code) code = String(raw.code);
+
+  var arc = DATA.prior && code ? DATA.prior.byCode[code] : null;
+  console.log('  ARCHIVE by code ' + (code || '(no code to look up)') + '  '
+    + (arc ? 'id=' + arc.id + '  ' + arc.web + '  ' + arc.pos + '  ' + arc.club
+        + '  pts=' + arc.get('total points')
+      : '(no row with that code)'));
+
+  var byName = DATA.prior && DATA.prior.byName[String(live.web).toLowerCase()];
+  if (byName) console.log('  ARCHIVE by name id=' + byName.id + '  code=' + byName.code
+    + '  ' + byName.web + '  ' + byName.pos + '  ' + byName.club);
+
+  var byId = DATA.prior && DATA.prior.byId[String(live.id)];
+  if (byId) console.log('  ARCHIVE by id   code=' + byId.code + '  ' + byId.web
+    + '  ' + byId.pos + '  ' + byId.club + '   <- this is what the old bug used');
+
+  console.log('  the card will show: ' + (arc ? arc.club + ' (from the code match)'
+    : 'no last season'));
+  return { live: live, raw: raw, archive: arc };
+}
+
+function playerCheckAll_(){
   var live = DATA.players || [];
   var stats = DATA.stats, prior = DATA.prior;
 
