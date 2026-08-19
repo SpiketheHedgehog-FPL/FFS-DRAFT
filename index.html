@@ -1766,8 +1766,58 @@ var CLUB_COLOURS = {
 };
 var CLUB_FALLBACK = ['#5A6570','#FFFFFF'];
 
+/* The long name for a code, so the card reads the same whichever
+   season it is showing - the raw sheet gives ARS, the archive gives
+   Arsenal, and neither should decide how it looks. */
+var CLUB_LONG = {
+  ARS:'Arsenal', AVL:'Aston Villa', BOU:'Bournemouth', BRE:'Brentford',
+  BHA:'Brighton', BUR:'Burnley', CHE:'Chelsea', CRY:'Crystal Palace',
+  EVE:'Everton', FUL:'Fulham', IPS:'Ipswich', LEE:'Leeds', LEI:'Leicester',
+  LIV:'Liverpool', MCI:'Man City', MUN:'Man Utd', NEW:'Newcastle',
+  NFO:'Nott\u2019m Forest', SOU:'Southampton', SUN:'Sunderland',
+  TOT:'Tottenham', WHU:'West Ham', WOL:'Wolves'
+};
+
+function clubLabel(v){
+  var c = clubCode(v);
+  return CLUB_LONG[c] || String(v || '');
+}
+
+/* Full club names to the three letter codes the colours are keyed on.
+
+   RAW_Players writes short codes because that is what the API sends;
+   the archive sheet holds full names. So last season every club
+   missed the lookup and came back grey, and the card showed the right
+   player in nobody's colours.
+
+   Matched on letters and digits only, so "Nott'm Forest",
+   "Nottingham Forest" and "nottm forest" all land.                  */
+var CLUB_NAMES = {
+  arsenal:'ARS', astonvilla:'AVL', bournemouth:'BOU', afcbournemouth:'BOU',
+  brentford:'BRE', brighton:'BHA', brightonhovealbion:'BHA', burnley:'BUR',
+  chelsea:'CHE', crystalpalace:'CRY', everton:'EVE', fulham:'FUL',
+  ipswich:'IPS', ipswichtown:'IPS', leeds:'LEE', leedsunited:'LEE',
+  leicester:'LEI', leicestercity:'LEI', liverpool:'LIV',
+  mancity:'MCI', manchestercity:'MCI', manutd:'MUN', manunited:'MUN',
+  manchesterunited:'MUN', newcastle:'NEW', newcastleunited:'NEW',
+  nottmforest:'NFO', nottinghamforest:'NFO', forest:'NFO',
+  southampton:'SOU', sunderland:'SUN', spurs:'TOT', tottenham:'TOT',
+  tottenhamhotspur:'TOT', westham:'WHU', westhamunited:'WHU',
+  wolves:'WOL', wolverhampton:'WOL', wolverhamptonwanderers:'WOL'
+};
+
+/* A club code from whatever the sheet happens to say. */
+function clubCode(v){
+  var raw = String(v || '').trim();
+  if (!raw) return '';
+  var up = raw.toUpperCase();
+  if (up.length <= 4 && (CLUB_COLOURS[up] || !/\s/.test(raw))) return up;
+  var key = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return CLUB_NAMES[key] || up;
+}
+
 function clubColour(code){
-  var k = String(code || '').toUpperCase().trim();
+  var k = clubCode(code);
   var sheet = DATA.clubs && DATA.clubs[k];
   if (sheet) return sheet;
   var c = CLUB_COLOURS[k] || CLUB_FALLBACK;
@@ -6365,7 +6415,7 @@ function paintPlayerCard(id, name){
   pos.style.cssText = 'font-size:9px;font-weight:900;letter-spacing:.9px;padding:2px 7px;'
     + 'background:' + (PO_POSCOL[p.pos] || '#8a939c') + ';color:#fff';
   meta.appendChild(pos);
-  meta.appendChild(cell_(String(p.clubName || p.club).toUpperCase(),
+  meta.appendChild(cell_(clubLabel(p.clubName || p.club).toUpperCase(),
     'font-size:11px;font-weight:700;opacity:.75'));
   if (p.owner){
     meta.appendChild(cell_('\u00b7', 'font-size:11px;opacity:.4'));
