@@ -494,7 +494,7 @@ var CONFIG = {
   squad: { budget: 100, size: 15, limits: { GK:2, DEF:5, MID:5, FWD:3 } },
   /* '26/27' as the honours images are named: 2627 */
   seasonCode: '2627',
-  sheetBase: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQzpbuaeYd1DzKkJszapnpA-iCmm_YPQmHuNxfYMhdMUGOjDtwuUsQFlqHEDpuQmpbr7aufi1UjhvQJ/pub?single=true&output=csv&gid=',
+  sheetBase: 'https://url.uk.m.mimecastprotect.com/s/WW4lCBNNkc7JWnjXhzfyWh2FyoD?domain=docs.google.com',
   refreshMs: 60000,
   leagues: [
     {
@@ -1088,7 +1088,12 @@ function parseTransfers(rows){
       goals: num(r[iG]), assists: num(r[iA]), cs: num(r[iCs]),
       code: iCode >= 0 ? (r[iCode] || '') : '',
       bonus: iBonus >= 0 ? num(r[iBonus]) : 0,
-      team: iTeam >= 0 ? (r[iTeam] || '') : '', fee: iFee >= 0 ? num(r[iFee]) : 0
+      team: iTeam >= 0 ? (r[iTeam] || '') : '', fee: iFee >= 0 ? num(r[iFee]) : 0,
+      /* the Players table asks for g and a; the sheet calls them
+         Goals and Assists. Two names for one number is how a column
+         ends up permanently blank with nothing to show for it. */
+      g: num(r[iG]), a: num(r[iA]),
+      ppg: 0
     };
   });
 }
@@ -1339,7 +1344,7 @@ var PlayerPhotos = (function(){
 
      When the asset set rolls over - premierleague26 and so on - change
      SET below and nothing else needs touching.                       */
-  var HOST  = 'https://resources.premierleague.com/';
+  var HOST  = 'https://url.uk.m.mimecastprotect.com/s/mU2SCD11ms5rYxqLT5hGxhjPil8?domain=resources.premierleague.com';
 
   /* The asset set is versioned and rolls over between seasons. Rather
      than hard-coding a guess, both are tried and the first that
@@ -1980,7 +1985,7 @@ var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2
              players:null, codes:null, bonus:null, squads:{}, byLeague:{},
              fixtures:[], scores:{}, positions:null,
              motm:[], champions:[], historic:[], text:null, register:[],
-             clubs:null, prior:null, stats:null };
+             clubs:null, prior:null, stats:null, live:null };
 var loaded = { home:false, league:false, h2h:false, cup:false, managers:false,
                players:false, portal:false, sliga:false, super:false, honours:false };
 var route = 'home';
@@ -2068,6 +2073,7 @@ function buildNav(){
 }
 
 function go(key){
+  if (key !== 'portal') liveStop();
   route = key;
   buildNav();
   var known = ['home','league','h2h','cup','sliga','super','managers','players',
@@ -2080,7 +2086,11 @@ function go(key){
   else if (key === 'cup')   { document.getElementById('p-cup').classList.add('on'); renderCup(); }
   else if (key === 'managers'){ document.getElementById('p-managers').classList.add('on'); renderManagers(); }
   else if (key === 'players'){ document.getElementById('p-players').classList.add('on'); renderPlayers(); }
-  else if (key === 'portal'){ document.getElementById('p-portal').classList.add('on'); renderPortal(); }
+  else if (key === 'portal'){
+    document.getElementById('p-portal').classList.add('on');
+    renderPortal();
+    liveStart();
+  }
   else if (key === 'sliga'){ document.getElementById('p-sliga').classList.add('on'); renderSuperLiga(); }
   else if (key === 'super'){ document.getElementById('p-super').classList.add('on'); renderSupercopa(); }
   else if (key === 'honours'){ document.getElementById('p-honours').classList.add('on'); renderHonours(); }
@@ -2233,6 +2243,7 @@ function boot(){
     if (DATA.players) DATA.players.forEach(function(p){ p.bonus = p.bonus || 0; });
 
     DATA.scores = mergedScores();
+    fillPlayerStats_();
     bootDone = false;
     useLeague(CONFIG.leagues[0].key);
     bootDone = true;
@@ -6626,6 +6637,38 @@ function playerTrace_(who){
   return { live: live, raw: raw, archive: arc };
 }
 
+/* How many distinct clubs the archive thinks there are. A healthy
+   season has twenty. One or two means the column is a dragged formula
+   with a locked reference, or a paste that filled down - which is the
+   sort of thing that looks like a lookup bug for two days. */
+function archiveClubs(){
+  if (!DATA.prior){ console.log('no archive loaded'); return null; }
+
+  var rows = Object.keys(DATA.prior.byCode).map(function(k){ return DATA.prior.byCode[k]; });
+  if (!rows.length) rows = Object.keys(DATA.prior.byId).map(function(k){ return DATA.prior.byId[k]; });
+
+  var count = {};
+  rows.forEach(function(r){
+    var c = String(r.club || '(blank)');
+    count[c] = (count[c] || 0) + 1;
+  });
+  var names = Object.keys(count).sort(function(a,b){ return count[b] - count[a]; });
+
+  console.log('archive clubs');
+  console.log('  rows            ', rows.length);
+  console.log('  distinct clubs  ', names.length,
+    names.length < 15 ? '  *** a Premier League season has twenty' : '');
+  names.slice(0, 25).forEach(function(n){
+    console.log('     ' + n + '  ' + count[n]);
+  });
+  if (names.length < 15){
+    console.log('');
+    console.log('  The Club column in USER_2526 Players is not one club per player.');
+    console.log('  Check it for a formula with a locked reference, or a fill-down.');
+  }
+  return count;
+}
+
 function playerCheckAll_(){
   var live = DATA.players || [];
   var stats = DATA.stats, prior = DATA.prior;
@@ -7172,6 +7215,45 @@ function paintPlayers(host){
 
 /* Points per million. The actual question in a money draft is whether
    somebody was worth what they cost. */
+/* The Transfer Player List carries the pool and the ownership; the raw
+   sheet carries the rest of the season's numbers. Joining them once at
+   boot means the Players table can show points per game, minutes and
+   the availability flag without every page doing its own lookup.
+
+   Matched on code where both have one, because element ids are
+   reassigned between seasons and the code is not.                    */
+function fillPlayerStats_(){
+  var st = DATA.stats;
+  if (!st || !DATA.players) return;
+
+  var joined = 0;
+  DATA.players.forEach(function(p){
+    var rec = (p.code && st.byCode[String(p.code)])
+      || (p.id && st.byId[String(p.id)])
+      || st.byName[String(p.web || '').toLowerCase()];
+    if (!rec) return;
+    joined++;
+
+    function g(k){
+      var v = rec.get(k);
+      return v === undefined || v === null || v === '' ? null : v;
+    }
+    var ppg = g('points_per_game');
+    if (ppg !== null) p.ppg = num(ppg);
+    if (g('minutes') !== null) p.minutes = num(g('minutes'));
+    if (g('starts') !== null) p.starts = num(g('starts'));
+    if (g('ict_index') !== null) p.ict = num(g('ict_index'));
+
+    /* availability, so the list can flag a player who has left the
+       league before anybody bids on him */
+    var chance = g('chance_of_playing_next_round');
+    p.chance = chance === null ? 100 : num(chance);
+    p.news = String(g('news') || '');
+  });
+
+  DATA.statsJoined = joined;
+}
+
 function playerValue_(p){
   var fee = num(p.fee);
   return fee > 0 ? p.pts / fee : 0;
@@ -7203,6 +7285,19 @@ function playerRow_(p, rank, COLS, POSCOL){
     flag.title = news || (gone ? 'Unavailable' : chance + '% chance of playing');
     nm.appendChild(flag);
   }
+  /* amber at 50, red at 0, with the reason on hover. Seeing it in the
+     list matters more than seeing it on the card - on draft night
+     nobody opens a card before they bid. */
+  if (p.chance !== undefined && p.chance < 100){
+    var flag = el('span', null, '!');
+    flag.title = p.news || (p.chance === 0 ? 'Unavailable' : p.chance + '% chance of playing');
+    flag.style.cssText = 'width:13px;height:13px;flex-shrink:0;display:flex;'
+      + 'align-items:center;justify-content:center;font-size:9px;font-weight:900;'
+      + 'color:#fff;background:' + (p.chance === 0 ? '#C0392B' : '#E8A317');
+    nm.appendChild(flag);
+    if (p.chance === 0) row.style.opacity = '.62';
+  }
+
   nm.appendChild(cell_(p.web,
     'font-size:13px;font-weight:800;color:#0C2340;white-space:nowrap;'
     + 'overflow:hidden;text-overflow:ellipsis'));
@@ -7360,6 +7455,101 @@ var PO_DARK   = '#1E1E1E';
 var PO_PANEL  = '#252525';
 var PO_POSCOL = { GK:'#5b8def', DEF:'#4CAF50', MID:'#E8B84B', FWD:'#E85C6A' };
 
+/* =====================================================================
+   THE LIVE LINK
+
+   The rest of the site reads published CSVs, which Google caches for
+   about five minutes. That is fine for a league table and useless on
+   draft night, where a signing needs to be on screen while everyone is
+   still looking at it.
+
+   So the Portal asks the Apps Script web app directly instead. JSONP
+   rather than fetch, because the dashboard is on github.io and the
+   script is on script.google.com - a script tag has no cross-origin
+   problem to negotiate.
+
+   Set LIVE_URL below to the web app's /exec address. Leave it empty
+   and nothing changes: the Portal falls back to the register CSV and
+   behaves exactly as it did.
+   ===================================================================== */
+
+var LIVE_URL = 'https://script.google.com/macros/s/AKfycbyP0ySxkxkTHa2mFlNyRSLDfffAZaDe01FFaw8_5ZQ25T3416nYcJAoEhBpSGe-XvdZ/exec';
+var LIVE_EVERY = 4000;
+var LIVE_TIMER = null;
+var LIVE_SEQ = 0;
+
+function liveOn(){ return !!LIVE_URL && PORTAL_VIEW !== 'audit'; }
+
+function livePoll(){
+  if (!liveOn()) return;
+
+  var cb = 'ffsLive' + (++LIVE_SEQ);
+  var tag = document.createElement('script');
+  var done = false;
+
+  window[cb] = function(data){
+    done = true;
+    if (data && data.ok){
+      DATA.live = data;
+      applyLive_(data);
+    }
+    cleanup();
+  };
+
+  function cleanup(){
+    try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+    if (tag.parentNode) tag.parentNode.removeChild(tag);
+  }
+
+  tag.onerror = cleanup;
+  tag.src = LIVE_URL + (LIVE_URL.indexOf('?') < 0 ? '?' : '&')
+    + 'q=live&cb=' + cb + '&t=' + Date.now();
+  document.head.appendChild(tag);
+
+  /* a poll that never answers must not leak a script tag every four
+     seconds for the rest of the evening */
+  setTimeout(function(){ if (!done) cleanup(); }, LIVE_EVERY * 2);
+}
+
+/* Only repaint when something has actually changed, or the page would
+   flicker every four seconds all night. */
+var LIVE_LAST = '';
+
+function applyLive_(data){
+  var stamp = data.register.length + ':' + data.phase;
+  if (stamp === LIVE_LAST) return;
+  LIVE_LAST = stamp;
+
+  DATA.register = data.register.map(function(r){
+    return { ts: r.ts, leagueKey: 'L1', action: String(r.action || '').toUpperCase(),
+             elementId: String(r.elementId || ''), player: r.player,
+             manager: r.manager, fee: num(r.fee), note: r.note || '' };
+  });
+
+  /* ownership follows the register, so the available list is right */
+  var owned = {};
+  DATA.register.forEach(function(r){
+    if (r.action === 'SIGN') owned[r.elementId] = r.manager;
+    else if (r.action === 'RELEASE') delete owned[r.elementId];
+  });
+  (DATA.players || []).forEach(function(p){
+    p.team = owned[String(p.id)] || '';
+  });
+
+  if (route === 'portal') paintPortal(document.getElementById('p-portal'));
+}
+
+function liveStart(){
+  if (LIVE_TIMER) clearInterval(LIVE_TIMER);
+  if (!liveOn()) return;
+  livePoll();
+  LIVE_TIMER = setInterval(livePoll, LIVE_EVERY);
+}
+
+function liveStop(){
+  if (LIVE_TIMER) { clearInterval(LIVE_TIMER); LIVE_TIMER = null; }
+}
+
 function renderPortal(){
   var host = document.getElementById('p-portal');
   if (loaded.portal) return;
@@ -7444,12 +7634,26 @@ function draftSub_(){
     + (signed ? signed + ' SIGNINGS' : 'NOTHING SIGNED YET');
 }
 
+/* Everyone in the draft league, whether they have signed anybody yet
+   or not.
+
+   This used to read the Squads sheet first, which lists only managers
+   who already have a squad. Before the draft that sheet is empty or
+   stale, so the budget board showed one manager instead of twelve -
+   and the eleven with nothing signed are exactly the ones you need to
+   see on the night.
+
+   The league table has every manager from the moment the raw pull
+   runs, so it goes first.                                            */
 function draftManagers_(){
+  var names = (DATA.table || []).map(function(t){ return t.name; });
+  if (names.length) return names;
+
   var d = DATA.byLeague[CONFIG.leagues[0].key];
   if (d && d.squads && d.squads.summary.length){
     return d.squads.summary.map(function(m){ return m.name; });
   }
-  return (DATA.table || []).map(function(t){ return t.name; });
+  return [];
 }
 
 
@@ -7844,25 +8048,79 @@ function portalBoard_(){
 
 /* Money left and slots filled, per manager, out of the Squads sheet -
    which already knows the fees, the positions and the budget. */
-function boardRows_(){
-  var d = DATA.byLeague[CONFIG.leagues[0].key];
-  var squads = d && d.squads;
-  var budget = CONFIG.squad ? CONFIG.squad.budget : 100;
+/* Squads built from the register, not from the Squads sheet.
 
-  return draftManagers_().map(function(n){
-    var mine = squads && squads.byManager[n];
-    var by = { GK:0, DEF:0, MID:0, FWD:0 };
-    var count = 0, spent = 0;
-    if (mine){
+   The Squads sheet is a derived thing that rebuilds when the workbook
+   is told to. On draft night that is far too slow - a signing appeared
+   in the feed and the manager's budget did not move, because the board
+   was reading a sheet last built that morning.
+
+   The register is the source of truth for who owns whom, so the board
+   is built from it directly. Position and club come from the player
+   pool by element id; the fee comes from the register row.
+
+   Falls back to the Squads sheet only when there is no register at
+   all, which is the rest of the year.                                */
+function liveSquads_(){
+  var budget = CONFIG.squad ? CONFIG.squad.budget : 100;
+  var reg = DATA.register || [];
+
+  var pos = {};
+  (DATA.players || []).forEach(function(p){ pos[String(p.id)] = p.pos; });
+
+  var out = {};
+  draftManagers_().forEach(function(n){
+    out[n] = { name: n, by: { GK:0, DEF:0, MID:0, FWD:0 },
+               count: 0, spent: 0, players: [] };
+  });
+
+  if (reg.length){
+    /* replayed in order, so a release genuinely gives the money back
+       and a re-signing lands on the new owner */
+    var held = {};
+    reg.forEach(function(r){
+      var id = String(r.elementId || '');
+      if (!id) return;
+      if (r.action === 'SIGN') held[id] = { manager: r.manager, fee: num(r.fee), player: r.player };
+      else if (r.action === 'RELEASE') delete held[id];
+    });
+
+    Object.keys(held).forEach(function(id){
+      var h = held[id];
+      var m = out[h.manager];
+      if (!m) return;
+      var p = pos[id] || '';
+      if (m.by[p] !== undefined) m.by[p]++;
+      m.count++;
+      m.spent += h.fee;
+      m.players.push({ id: id, name: h.player, pos: p, fee: h.fee });
+    });
+  } else {
+    /* no register loaded - fall back to the sheet */
+    var d = DATA.byLeague[CONFIG.leagues[0].key];
+    var sq = d && d.squads;
+    if (sq) draftManagers_().forEach(function(n){
+      var mine = sq.byManager[n];
+      if (!mine) return;
       mine.players.forEach(function(p){
-        if (by[p.pos] !== undefined) by[p.pos]++;
-        count++;
-        if (p.fee !== null) spent += p.fee;
+        if (out[n].by[p.pos] !== undefined) out[n].by[p.pos]++;
+        out[n].count++;
+        if (p.fee !== null) out[n].spent += p.fee;
+        out[n].players.push(p);
       });
-    }
-    return { name: n, by: by, count: count,
-             left: Math.round((budget - spent) * 10) / 10 };
-  }).sort(function(a,b){ return a.left - b.left || a.name.localeCompare(b.name); });
+    });
+  }
+
+  Object.keys(out).forEach(function(n){
+    out[n].left = Math.round((budget - out[n].spent) * 10) / 10;
+  });
+  return out;
+}
+
+function boardRows_(){
+  var sq = liveSquads_();
+  return Object.keys(sq).map(function(n){ return sq[n]; })
+    .sort(function(a,b){ return a.left - b.left || a.name.localeCompare(b.name); });
 }
 
 function moneyCol_(v){
@@ -8000,12 +8258,14 @@ function portalFeed_(host){
    ===================================================================== */
 
 function portalSquads_(wrap){
-  var d = DATA.byLeague[CONFIG.leagues[0].key];
-  var squads = d && d.squads;
+  /* the same live source as the budget board - the Squads sheet is
+     rebuilt on a schedule and on the night that is far too slow */
+  var live = liveSquads_();
+  var anyone = Object.keys(live).some(function(n){ return live[n].count > 0; });
 
-  if (!squads || !squads.summary.length){
+  if (!anyone){
     wrap.appendChild(portalNote_(txt('empty.squad',
-      'No squads yet. They appear once the draft has happened.')));
+      'No squads yet. They appear as soon as the first player is signed.')));
     return;
   }
 
@@ -8018,7 +8278,7 @@ function portalSquads_(wrap){
     + 'gap:10px;padding:16px';
 
   draftManagers_().forEach(function(name){
-    var mine = squads.byManager[name];
+    var mine = live[name];
     var kit = kitFor(name);
     var by = {};
     order.forEach(function(p){ by[p] = []; });
@@ -8154,3 +8414,4 @@ boot();
 </script>
 </body>
 </html>
+
