@@ -66,10 +66,56 @@ img{display:block;max-width:100%}
    there you are reading far more often than bidding */
 @media(max-width:760px){
   .po-grid{flex-direction:column}
-  .po-left{width:100%!important;position:static!important;order:2;
-           border-right:none!important;border-top:1px solid #383838}
-  .po-right{order:1}
+  .po-left{width:100%!important;position:static!important;order:1;
+           border-right:none!important;border-bottom:1px solid #383838}
+  .po-right{order:2}
+
+  /* THE SQUAD BOARD BECOMES CARDS
+
+     On a laptop it is twelve rows of fixed pixel columns, which is
+     right there and impossible on a phone - the columns simply march
+     off the side and REMAINING and SQUAD are never seen.
+
+     So each manager becomes a block instead: name and money on the
+     top line, the detail wrapped underneath. Nothing is dropped and
+     nothing scrolls sideways.                                        */
+  .sb-row{display:grid !important;
+          grid-template-columns:34px 1fr auto;
+          grid-template-areas:"av nm money" ". detail detail";
+          align-items:center;
+          height:auto !important;
+          gap:4px 9px !important;
+          padding:9px 0 10px;
+          border-top:3px solid #4CAF50;
+          border-bottom:1px solid #2b2b2b !important;
+          background:#232323;
+          margin-bottom:5px}
+  .sb-av{grid-area:av}
+  .sb-nm{grid-area:nm;width:auto !important;flex:none !important;font-size:15px !important}
+  .sb-money{grid-area:money;width:auto !important;font-size:17px !important;line-height:1}
+  .sb-cnt{grid-area:money;width:auto !important;align-self:end;
+          font-size:9px !important;margin-top:22px}
+
+  /* the slot blocks keep their place, on their own line and labelled -
+     on a laptop the column headers say which group each is, and on a
+     phone there are no headers to do that */
+  .sb-slots{grid-area:detail;display:flex !important;flex-wrap:wrap;gap:9px;
+            margin-top:2px}
+  .sb-slot{width:auto !important;display:inline-flex !important;
+           align-items:center;gap:4px}
+  .sb-lab{display:inline !important;font-size:8px;font-weight:800;
+          letter-spacing:.6px;color:#7a7a7a;width:22px}
+  .sb-b{width:7px !important;height:12px !important}
+
+  .sb-req{grid-area:detail;width:auto !important;flex:none !important;
+          white-space:normal !important;margin-top:2px}
+
+  /* the board header row means nothing once it is cards */
+  .sb-cols{display:none !important}
 }
+
+/* the slot labels exist only for the phone layout */
+.sb-lab{display:none}
 
 /* notices - typed into USER_TEXT, live within minutes because that
    sheet is read straight from the published CSV rather than waiting
@@ -565,6 +611,7 @@ var CONFIG = {
       fixtures:      '727393446',
       positions:     '1065222355',
       rawPlayers:    '910048920',
+      managerMap:    '735240943',
       motmCalc:      '1242719057',
       text:          '669929533'
     }
@@ -1749,6 +1796,39 @@ function txt(key, fallback){
    The transaction log the draft tool writes. The portal reads it for
    the ticker, the done-deal panel and the feed, so those show what
    actually happened rather than anything worked out afterwards.    */
+/* Manager Map: entry_id | league_key | short_name | real_name | active
+
+   The only list of managers that exists before a ball is kicked. The
+   league table is empty until a gameweek has been played and the
+   Squads sheet is empty until somebody signs, so on draft night this
+   is the only source that knows who is playing.                      */
+function parseManagerMap(rows){
+  if (!rows || rows.length < 2) return null;
+  var head = rows[0].map(function(h){ return String(h || '').trim().toLowerCase(); });
+  function ix(){
+    for (var i = 0; i < arguments.length; i++){
+      var k = head.indexOf(arguments[i]);
+      if (k >= 0) return k;
+    }
+    return -1;
+  }
+  var iLg = ix('league_key','league'), iSn = ix('short_name','short','name');
+  var iAct = ix('active');
+  if (iSn < 0) return null;
+
+  var out = [];
+  rows.slice(1).forEach(function(r){
+    var name = String(r[iSn] || '').trim();
+    if (!name) return;
+    if (iAct >= 0){
+      var a = String(r[iAct]).trim().toLowerCase();
+      if (a === 'no' || a === 'false' || a === '0') return;
+    }
+    out.push({ name: name, leagueKey: iLg >= 0 ? String(r[iLg] || '').trim() : '' });
+  });
+  return out.length ? out : null;
+}
+
 function parseRegister(rows){
   if (!rows || rows.length < 2) return [];
   var out = [];
@@ -1985,7 +2065,7 @@ var DATA = { table:null, gw:null, h2h:null, cup:null, h2hKO:null, cupKO:null, h2
              players:null, codes:null, bonus:null, squads:{}, byLeague:{},
              fixtures:[], scores:{}, positions:null,
              motm:[], champions:[], historic:[], text:null, register:[],
-             clubs:null, prior:null, stats:null, live:null };
+             clubs:null, prior:null, stats:null, live:null, managerMap:null };
 var loaded = { home:false, league:false, h2h:false, cup:false, managers:false,
                players:false, portal:false, sliga:false, super:false, honours:false };
 var route = 'home';
@@ -2150,6 +2230,8 @@ function boot(){
     .then(function(t){ DATA.text = t; }));
   jobs.push(fetchSheet(SHARED,'register').then(parseRegister).catch(function(){ return []; })
     .then(function(r){ DATA.register = r; }));
+  jobs.push(fetchSheet(SHARED,'managerMap').then(parseManagerMap).catch(function(){ return null; })
+    .then(function(m){ DATA.managerMap = m; }));
   jobs.push(fetchSheet(SHARED,'players2526').then(parsePlayerStats).catch(function(){ return null; })
     .then(function(x){ DATA.prior = x; }));
   /* the full stats for this season, straight off the raw layer */
@@ -7660,10 +7742,24 @@ function draftSub_(){
    The league table has every manager from the moment the raw pull
    runs, so it goes first.                                            */
 function draftManagers_(){
+  /* The Manager Map first, because it is the only one that knows who
+     is playing before anything has happened. The league table is empty
+     until a gameweek is played and the Squads sheet until somebody
+     signs - so on draft night both were falling through to whatever
+     stale thing had a row in it, and the board showed one manager
+     instead of twelve. */
+  var key = CONFIG.leagues[0].key;
+  if (DATA.managerMap){
+    var mine = DATA.managerMap.filter(function(m){
+      return !m.leagueKey || m.leagueKey === key;
+    }).map(function(m){ return m.name; });
+    if (mine.length) return mine.sort();
+  }
+
   var names = (DATA.table || []).map(function(t){ return t.name; });
   if (names.length) return names;
 
-  var d = DATA.byLeague[CONFIG.leagues[0].key];
+  var d = DATA.byLeague[key];
   if (d && d.squads && d.squads.summary.length){
     return d.squads.summary.map(function(m){ return m.name; });
   }
@@ -7937,7 +8033,7 @@ function portalBoard_(){
   head.appendChild(right);
   pad.appendChild(head);
 
-  var cols = el('div');
+  var cols = el('div', 'sb-cols');
   cols.style.cssText = 'display:flex;align-items:center;gap:9px;padding-bottom:8px;'
     + 'border-bottom:1px solid #333;font-size:8px;font-weight:800;letter-spacing:.9px;color:#6b6b6b';
   pad.appendChild(cols);
@@ -7985,11 +8081,14 @@ function portalBoard_(){
       var kit = kitFor(t.name);
       var done = t.count >= (CONFIG.squad ? CONFIG.squad.size : 15);
 
-      var row = el('div');
+      /* classed as well as styled, so the phone layout can restyle it.
+         Everything here is still inline for the laptop; the media query
+         only adds. */
+      var row = el('div', 'sb-row' + (done ? ' sb-done' : ''));
       row.style.cssText = 'display:flex;align-items:center;gap:9px;height:42px;'
         + 'border-bottom:1px solid #2b2b2b' + (done ? ';opacity:.72' : '');
 
-      var av = el('span');
+      var av = el('span', 'sb-av');
       av.style.cssText = 'width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;'
         + 'background:' + kit.main + ';color:' + kit.text + ';display:flex;align-items:center;'
         + 'justify-content:center;font-size:11px;font-weight:900';
@@ -8001,40 +8100,65 @@ function portalBoard_(){
       row.appendChild(av);
 
       if (PO_BOARD === 0){
-        row.appendChild(cell_(t.name,
+        var nm = cell_(t.name,
           'flex:1;font-size:14px;font-weight:800;color:#fff;white-space:nowrap;'
-          + 'overflow:hidden;text-overflow:ellipsis'));
+          + 'overflow:hidden;text-overflow:ellipsis');
+        nm.className = 'sb-nm';
+        row.appendChild(nm);
+
+        var slots = el('div', 'sb-slots');
+        slots.style.cssText = 'display:contents';
         order.forEach(function(pos){
           var cap = lims[pos] || 3, got = t.by[pos] || 0;
-          var slot = el('span');
+          var slot = el('span', 'sb-slot');
           slot.style.cssText = 'width:' + (cap * 12 + 6) + 'px;text-align:center;'
             + 'display:inline-flex;gap:3px;justify-content:center';
+
+          /* the label only shows on a phone, where there are no column
+             headers to say which group this is */
+          var lab = el('span', 'sb-lab', pos);
+          slot.appendChild(lab);
+
           for (var k = 0; k < cap; k++){
-            var b = el('span');
+            var b = el('span', 'sb-b');
             b.style.cssText = 'width:9px;height:14px;box-sizing:border-box;'
               + (k < got ? 'background:#4CAF50' : 'border:1px solid #545454');
             slot.appendChild(b);
           }
-          row.appendChild(slot);
+          slots.appendChild(slot);
         });
+        row.appendChild(slots);
       } else {
-        row.appendChild(cell_(t.name,
-          'width:84px;font-size:14px;font-weight:800;color:#fff;white-space:nowrap'));
+        var nm2 = cell_(t.name,
+          'width:84px;font-size:14px;font-weight:800;color:#fff;white-space:nowrap');
+        nm2.className = 'sb-nm';
+        row.appendChild(nm2);
         var need = [];
         order.forEach(function(pos){
           var cap = lims[pos] || 3, got = t.by[pos] || 0;
           if (got < cap) need.push((cap - got) + ' ' + pos);
         });
-        row.appendChild(cell_(done ? 'Squad complete' : need.join('  \u00b7  '),
+        var req = cell_(done ? 'Squad complete' : need.join('  \u00b7  '),
           'flex:1;font-size:12px;font-weight:700;color:' + (done ? '#4CAF50' : '#F5A800')
-          + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis'));
+          + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis');
+        req.className = 'sb-req';
+        row.appendChild(req);
       }
 
-      row.appendChild(cell_(t.left === null ? '\u2013' : t.left.toFixed(1) + 'm',
-        'width:66px;text-align:right;font-size:15px;font-weight:900;color:' + moneyCol_(t.left)));
-      row.appendChild(cell_(t.count + '/' + (CONFIG.squad ? CONFIG.squad.size : 15),
+      var money = cell_(t.left === null ? '\u2013' : t.left.toFixed(1) + 'm',
+        'width:66px;text-align:right;font-size:15px;font-weight:900;color:' + moneyCol_(t.left));
+      money.className = 'sb-money';
+      row.appendChild(money);
+
+      var cnt = cell_(t.count + '/' + (CONFIG.squad ? CONFIG.squad.size : 15),
         'width:44px;text-align:right;font-size:12px;font-weight:800;color:'
-        + (done ? '#4CAF50' : '#8a8a8a')));
+        + (done ? '#4CAF50' : '#8a8a8a'));
+      cnt.className = 'sb-cnt';
+      row.appendChild(cnt);
+
+      /* the top strip of the phone card - name, money, count on one
+         line - built from the same numbers rather than a second source */
+      row.setAttribute('data-money', t.left === null ? '\u2013' : t.left.toFixed(1) + 'm');
       body.appendChild(row);
     });
 
@@ -8093,21 +8217,24 @@ function liveSquads_(){
        and a re-signing lands on the new owner */
     var held = {};
     reg.forEach(function(r){
-      var id = String(r.elementId || '');
-      if (!id) return;
-      if (r.action === 'SIGN') held[id] = { manager: r.manager, fee: num(r.fee), player: r.player };
+      /* the element id is the right key, but a row without one should
+         still count rather than vanish - the player's name will do */
+      var id = String(r.elementId || '').trim() || ('n:' + String(r.player || '').trim());
+      if (id === 'n:') return;
+      if (r.action === 'SIGN') held[id] = { manager: r.manager, fee: num(r.fee),
+                                            player: r.player, eid: String(r.elementId || '') };
       else if (r.action === 'RELEASE') delete held[id];
     });
 
     Object.keys(held).forEach(function(id){
       var h = held[id];
-      var m = out[h.manager];
+      var m = out[String(h.manager || '').trim()];
       if (!m) return;
-      var p = pos[id] || '';
+      var p = pos[h.eid] || '';
       if (m.by[p] !== undefined) m.by[p]++;
       m.count++;
       m.spent += h.fee;
-      m.players.push({ id: id, name: h.player, pos: p, fee: h.fee });
+      m.players.push({ id: h.eid || id, name: h.player, pos: p, fee: h.fee });
     });
   } else {
     /* no register loaded - fall back to the sheet */
